@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\InvestmentHub.Domain\InvestmentHub.Domain.csproj" />
+    <ProjectReference Include="..\InvestmentHub.Application\InvestmentHub.Application.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

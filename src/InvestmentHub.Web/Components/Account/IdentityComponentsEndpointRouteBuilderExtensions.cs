@@ -6,9 +6,9 @@ using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
-using InvestmentHub.Components.Account.Pages;
-using InvestmentHub.Components.Account.Pages.Manage;
-using InvestmentHub.Data;
+using InvestmentHub.Web.Components.Account.Pages;
+using InvestmentHub.Web.Components.Account.Pages.Manage;
+using InvestmentHub.Web.Data;
 
 namespace Microsoft.AspNetCore.Routing;
 

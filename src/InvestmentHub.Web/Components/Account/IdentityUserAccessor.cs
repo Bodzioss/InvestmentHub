@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Identity;
-using InvestmentHub.Data;
+using InvestmentHub.Web.Data;
 
-namespace InvestmentHub.Components.Account;
+namespace InvestmentHub.Web.Components.Account;
 
 internal sealed class IdentityUserAccessor(UserManager<ApplicationUser> userManager, IdentityRedirectManager redirectManager)
 {

@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Components;
 
-namespace InvestmentHub.Components.Account;
+namespace InvestmentHub.Web.Components.Account;
 
 internal sealed class IdentityRedirectManager(NavigationManager navigationManager)
 {

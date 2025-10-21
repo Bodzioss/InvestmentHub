@@ -4,18 +4,19 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>aspnet-InvestmentHub-433e0372-305e-4fb8-b99f-1b9bc9ce8be0</UserSecretsId>
+    <UserSecretsId>aspnet-InvestmentHub-dc00fb88-336d-4c92-995d-beb9ffc167b1</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.5.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\host\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

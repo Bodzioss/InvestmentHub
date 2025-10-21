@@ -1,0 +1,144 @@
+# =========================================
+# .NET / Visual Studio / Aspire / Blazor
+# =========================================
+
+## Build results
+bin/
+obj/
+out/
+Debug/
+Release/
+build/
+
+## User-specific files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+.vs/
+.vscode/
+*.swp
+
+## ASP.NET / Blazor / Aspire
+wwwroot/dist/
+wwwroot/node_modules/
+wwwroot/css/
+wwwroot/js/
+wwwroot/lib/
+.bundle/
+temp/
+logs/
+App_Data/
+
+# Aspire auto-generated runtime data
+*.dapr/
+*.orchestrator/
+aspirehoststate.json
+aspirehoststate/
+logs/
+.docker/
+.env.local
+
+## Local environment & secrets
+.env
+.env.*
+*.secret.json
+secrets.json
+appsettings.Development.json
+appsettings.Local.json
+
+## Entity Framework migrations (if not shared)
+migrations/
+
+## Packages
+*.nupkg
+*.snupkg
+*.nuspec
+packages/
+.nuget/
+*.cache
+*.bak
+
+## Publish results
+publish/
+wwwroot/_framework/
+node_modules/
+dist/
+*.gz
+*.map
+
+## Logs and temp files
+*.log
+*.tlog
+*.tmp
+*.temp
+*.pidb
+*.svclog
+*.scc
+
+## Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+
+## Docker
+docker-compose.override.yml
+docker-compose.debug.yml
+**/Dockerfile.development
+**/Dockerfile.local
+**/docker-compose.*
+.dockerignore
+*.containerignore
+
+## Aspire Dashboard local cache
+AspireHostStorage/
+AspireHostLogs/
+*.aspirehoststate.json
+*.aspirelaunchsettings.json
+
+## JetBrains Rider / ReSharper
+.idea/
+*.DotSettings.user
+_ReSharper*/
+*.ncrunch*
+*.dotCover
+
+## macOS / Linux
+.DS_Store
+*.AppleDouble
+*.LSOverride
+Thumbs.db
+ehthumbs.db
+Icon?
+._*
+
+## Temporary backup files
+*.bak
+*.orig
+*.tmp
+*.old
+*.rej
+
+## Node.js (for Blazor + JS interop)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+## Terraform / IaC
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+
+## Azure / Cloud
+.publishsettings
+*.azurePubxml
+ServiceDependencies.json
+Connected Services/
+
+# =========================================
+# End of file
+# =========================================

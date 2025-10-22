@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\host\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\InvestmentHub.Infrastructure\InvestmentHub.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

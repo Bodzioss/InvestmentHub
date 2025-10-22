@@ -9,10 +9,17 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
+    
+    <!-- Database and Cache -->
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.5.0" />
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="9.5.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\InvestmentHub.Application\InvestmentHub.Application.csproj" />
+    <ProjectReference Include="..\InvestmentHub.Infrastructure\InvestmentHub.Infrastructure.csproj" />
+    <ProjectReference Include="..\InvestmentHub.Web\InvestmentHub.Web.csproj" />
     <ProjectReference Include="..\..\host\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>

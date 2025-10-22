@@ -244,7 +244,7 @@ public class RedisTestController : ControllerBase
             var retrievedNumber = await _cache.GetStringAsync("test-number");
             var retrievedObject = await _cache.GetStringAsync("test-object");
             
-            var parsedObject = JsonSerializer.Deserialize<object>(retrievedObject);
+            var parsedObject = JsonSerializer.Deserialize<object>(retrievedObject ?? "{}");
             
             _logger.LogInformation("Informacje o Redis pobrane pomyślnie");
             
@@ -255,7 +255,7 @@ public class RedisTestController : ControllerBase
                 DataTypes = new
                 {
                     String = new { Original = stringValue, Retrieved = retrievedString, Match = stringValue == retrievedString },
-                    Number = new { Original = numberValue, Retrieved = int.Parse(retrievedNumber), Match = numberValue.ToString() == retrievedNumber },
+                    Number = new { Original = numberValue, Retrieved = int.Parse(retrievedNumber ?? "0"), Match = numberValue.ToString() == retrievedNumber },
                     Object = new { Original = objectValue, Retrieved = parsedObject, Match = true }
                 },
                 Timestamp = DateTime.UtcNow

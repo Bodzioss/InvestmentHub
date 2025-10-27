@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using InvestmentHub.Domain.Repositories;
 using InvestmentHub.Domain.ValueObjects;
+using InvestmentHub.Domain.Entities;
 
 namespace InvestmentHub.Infrastructure.Data.Repositories;
 
@@ -18,10 +19,24 @@ public class UserRepository : IUserRepository
     }
 
     /// <inheritdoc/>
+    public async Task<IEnumerable<User>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public async Task<User?> GetByIdAsync(UserId userId, CancellationToken cancellationToken = default)
     {
         return await _context.Users
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
     }
 
     /// <inheritdoc/>

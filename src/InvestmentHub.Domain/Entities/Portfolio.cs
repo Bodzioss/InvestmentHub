@@ -17,7 +17,7 @@ public class Portfolio
     /// <summary>
     /// Gets the unique identifier of the portfolio.
     /// </summary>
-    public PortfolioId Id { get; }
+    public PortfolioId Id { get; private set; }
     
     /// <summary>
     /// Gets the name of the portfolio.
@@ -32,12 +32,12 @@ public class Portfolio
     /// <summary>
     /// Gets the unique identifier of the portfolio owner.
     /// </summary>
-    public UserId OwnerId { get; }
+    public UserId OwnerId { get; private set; }
     
     /// <summary>
     /// Gets the date when the portfolio was created.
     /// </summary>
-    public DateTime CreatedDate { get; }
+    public DateTime CreatedDate { get; private set; }
     
     /// <summary>
     /// Gets the date when the portfolio was last updated.
@@ -58,6 +58,15 @@ public class Portfolio
     /// Gets a read-only collection of domain events raised by this aggregate.
     /// </summary>
     public IReadOnlyCollection<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+    
+    /// <summary>
+    /// Private parameterless constructor for EF Core.
+    /// </summary>
+    private Portfolio()
+    {
+        // EF Core requires a parameterless constructor
+        // Values will be set through properties
+    }
     
     /// <summary>
     /// Initializes a new instance of the Portfolio class.

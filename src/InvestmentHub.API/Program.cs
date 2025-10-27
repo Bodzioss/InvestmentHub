@@ -10,6 +10,8 @@ using MediatR;
 using InvestmentHub.Domain.Handlers.Commands;
 using InvestmentHub.Domain.Handlers.Queries;
 using InvestmentHub.Domain.Behaviors;
+using InvestmentHub.Domain.Validators;
+using InvestmentHub.API.Mapping;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,11 +44,12 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Add AutoMapper
-builder.Services.AddAutoMapper(typeof(Program));
+builder.Services.AddAutoMapper(typeof(InvestmentMappingProfile));
 
 // Add FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
+builder.Services.AddValidatorsFromAssembly(typeof(AddInvestmentCommandValidator).Assembly);
 
 // Add MediatR
 builder.Services.AddMediatR(cfg =>
@@ -61,6 +64,13 @@ builder.Services.AddMediatR(cfg =>
 });
 
 var app = builder.Build();
+
+// Ensure database is created and seeded
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await DatabaseSeeder.SeedAsync(context);
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -1,4 +1,5 @@
 using InvestmentHub.Domain.ValueObjects;
+using InvestmentHub.Domain.Entities;
 
 namespace InvestmentHub.Domain.Repositories;
 
@@ -9,12 +10,27 @@ namespace InvestmentHub.Domain.Repositories;
 public interface IUserRepository
 {
     /// <summary>
+    /// Gets all users.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Collection of all users</returns>
+    Task<IEnumerable<User>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets a user by its ID.
     /// </summary>
     /// <param name="userId">The user ID</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The user if found, null otherwise</returns>
     Task<User?> GetByIdAsync(UserId userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a user by email address.
+    /// </summary>
+    /// <param name="email">The user's email address</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The user if found, null otherwise</returns>
+    Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Checks if a user exists.
@@ -40,46 +56,4 @@ public interface IUserRepository
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if user can create more portfolios, false otherwise</returns>
     Task<bool> CanCreatePortfolioAsync(UserId userId, int maxPortfolios = 10, CancellationToken cancellationToken = default);
-}
-
-/// <summary>
-/// Simple User entity for repository operations.
-/// In a real application, this would be a full domain entity.
-/// </summary>
-public class User
-{
-    /// <summary>
-    /// Gets the user ID.
-    /// </summary>
-    public UserId Id { get; }
-
-    /// <summary>
-    /// Gets the user name.
-    /// </summary>
-    public string Name { get; }
-
-    /// <summary>
-    /// Gets the user email.
-    /// </summary>
-    public string Email { get; }
-
-    /// <summary>
-    /// Gets the user creation date.
-    /// </summary>
-    public DateTime CreatedAt { get; }
-
-    /// <summary>
-    /// Initializes a new instance of the User class.
-    /// </summary>
-    /// <param name="id">The user ID</param>
-    /// <param name="name">The user name</param>
-    /// <param name="email">The user email</param>
-    /// <param name="createdAt">The creation date</param>
-    public User(UserId id, string name, string email, DateTime createdAt)
-    {
-        Id = id;
-        Name = name;
-        Email = email;
-        CreatedAt = createdAt;
-    }
 }

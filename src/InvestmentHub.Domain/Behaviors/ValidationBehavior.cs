@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
-using System.ComponentModel.DataAnnotations;
+using FluentValidation;
+using FluentValidation.Results;
 
 namespace InvestmentHub.Domain.Behaviors;
 
@@ -14,14 +15,19 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
     where TRequest : IRequest<TResponse>
 {
     private readonly ILogger<ValidationBehavior<TRequest, TResponse>> _logger;
+    private readonly IEnumerable<IValidator<TRequest>> _validators;
 
     /// <summary>
     /// Initializes a new instance of the ValidationBehavior class.
     /// </summary>
     /// <param name="logger">The logger instance</param>
-    public ValidationBehavior(ILogger<ValidationBehavior<TRequest, TResponse>> logger)
+    /// <param name="validators">The validators for the request type</param>
+    public ValidationBehavior(
+        ILogger<ValidationBehavior<TRequest, TResponse>> logger,
+        IEnumerable<IValidator<TRequest>> validators)
     {
         _logger = logger;
+        _validators = validators;
     }
 
     /// <summary>
@@ -44,15 +50,19 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
             requestType,
             requestName);
 
-        // Perform data annotations validation
-        var validationResults = new List<ValidationResult>();
-        var validationContext = new ValidationContext(request);
+        // Perform FluentValidation
+        var validationFailures = new List<ValidationFailure>();
         
-        if (!Validator.TryValidateObject(request, validationContext, validationResults, true))
+        foreach (var validator in _validators)
         {
-            var errors = validationResults
-                .Select(r => r.ErrorMessage)
-                .Where(e => !string.IsNullOrEmpty(e))
+            var validationResult = await validator.ValidateAsync(request, cancellationToken);
+            validationFailures.AddRange(validationResult.Errors);
+        }
+
+        if (validationFailures.Any())
+        {
+            var errors = validationFailures
+                .Select(f => f.ErrorMessage)
                 .ToList();
 
             _logger.LogWarning(
@@ -61,8 +71,6 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
                 requestName,
                 string.Join(", ", errors));
 
-            // For now, we'll let the validation errors bubble up
-            // In a real application, you might want to return a validation failure result
             throw new ValidationException($"Validation failed: {string.Join(", ", errors)}");
         }
 

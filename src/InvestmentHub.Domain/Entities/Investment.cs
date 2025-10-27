@@ -12,17 +12,17 @@ public class Investment
     /// <summary>
     /// Gets the unique identifier of the investment.
     /// </summary>
-    public InvestmentId Id { get; }
+    public InvestmentId Id { get; private set; }
     
     /// <summary>
     /// Gets the unique identifier of the portfolio this investment belongs to.
     /// </summary>
-    public PortfolioId PortfolioId { get; }
+    public PortfolioId PortfolioId { get; private set; }
     
     /// <summary>
     /// Gets the financial symbol representing the investment.
     /// </summary>
-    public Symbol Symbol { get; }
+    public Symbol Symbol { get; private set; }
     
     /// <summary>
     /// Gets the current market value of the investment.
@@ -54,6 +54,15 @@ public class Investment
     /// </summary>
     public InvestmentStatus Status { get; private set; }
     
+    /// <summary>
+    /// Private parameterless constructor for EF Core.
+    /// </summary>
+    private Investment()
+    {
+        // EF Core requires a parameterless constructor
+        // Values will be set through properties
+    }
+
     /// <summary>
     /// Initializes a new instance of the Investment class.
     /// </summary>

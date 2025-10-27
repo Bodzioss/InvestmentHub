@@ -4,6 +4,8 @@ using InvestmentHub.Domain.Commands;
 using InvestmentHub.Domain.Queries;
 using InvestmentHub.Domain.ValueObjects;
 using InvestmentHub.Domain.Enums;
+using AutoMapper;
+using InvestmentHub.API.DTOs;
 
 namespace InvestmentHub.API.Controllers;
 
@@ -16,16 +18,19 @@ public class InvestmentsController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ILogger<InvestmentsController> _logger;
+    private readonly IMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the InvestmentsController class.
     /// </summary>
     /// <param name="mediator">The MediatR mediator</param>
     /// <param name="logger">The logger</param>
-    public InvestmentsController(IMediator mediator, ILogger<InvestmentsController> logger)
+    /// <param name="mapper">The AutoMapper instance</param>
+    public InvestmentsController(IMediator mediator, ILogger<InvestmentsController> logger, IMapper mapper)
     {
         _mediator = mediator;
         _logger = logger;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -38,13 +43,7 @@ public class InvestmentsController : ControllerBase
     {
         try
         {
-            var command = new AddInvestmentCommand(
-                PortfolioId.FromString(request.PortfolioId),
-                new Symbol(request.Symbol.Ticker, request.Symbol.Exchange, Enum.Parse<AssetType>(request.Symbol.AssetType)),
-                new Money(request.PurchasePrice.Amount, Enum.Parse<Currency>(request.PurchasePrice.Currency)),
-                request.Quantity,
-                request.PurchaseDate);
-
+            var command = _mapper.Map<AddInvestmentCommand>(request);
             var result = await _mediator.Send(command);
 
             if (result.IsSuccess)
@@ -64,20 +63,14 @@ public class InvestmentsController : ControllerBase
     /// <summary>
     /// Updates an investment's current value.
     /// </summary>
-    /// <param name="investmentId">The investment ID</param>
     /// <param name="request">The update value request</param>
     /// <returns>The result of the operation</returns>
-    [HttpPut("{investmentId}/value")]
-    public async Task<IActionResult> UpdateInvestmentValue(
-        [FromRoute] string investmentId,
-        [FromBody] UpdateInvestmentValueRequest request)
+    [HttpPut("value")]
+    public async Task<IActionResult> UpdateInvestmentValue([FromBody] UpdateInvestmentValueRequest request)
     {
         try
         {
-            var command = new UpdateInvestmentValueCommand(
-                InvestmentId.FromString(investmentId),
-                new Money(request.CurrentPrice.Amount, Enum.Parse<Currency>(request.CurrentPrice.Currency)));
-
+            var command = _mapper.Map<UpdateInvestmentValueCommand>(request);
             var result = await _mediator.Send(command);
 
             if (result.IsSuccess)
@@ -90,6 +83,34 @@ public class InvestmentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating investment value");
+            return StatusCode(500, new { Error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Gets all investments for a portfolio.
+    /// </summary>
+    /// <param name="portfolioId">The portfolio ID</param>
+    /// <returns>The investments data</returns>
+    [HttpGet("portfolio/{portfolioId}")]
+    public async Task<IActionResult> GetInvestmentsByPortfolio([FromRoute] string portfolioId)
+    {
+        try
+        {
+            var query = new GetInvestmentsQuery(PortfolioId.FromString(portfolioId));
+            var result = await _mediator.Send(query);
+
+            if (result.IsSuccess && result.Investments != null)
+            {
+                var response = result.Investments.Select(inv => _mapper.Map<InvestmentResponseDto>(inv)).ToList();
+                return Ok(response);
+            }
+
+            return BadRequest(new { Error = result.ErrorMessage });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving investments for portfolio {PortfolioId}", portfolioId);
             return StatusCode(500, new { Error = "Internal server error" });
         }
     }
@@ -109,17 +130,16 @@ public class InvestmentsController : ControllerBase
 
             if (result.IsSuccess && result.Investment != null)
             {
-                return Ok(new
-                {
-                    InvestmentId = result.Investment.Id.Value,
-                    Symbol = result.Investment.Symbol.Ticker,
-                    Quantity = result.Investment.Quantity,
-                    CurrentValue = result.Investment.CurrentValue.Amount,
-                    Currency = result.Investment.CurrentValue.Currency.ToString()
-                });
+                var response = _mapper.Map<InvestmentResponseDto>(result.Investment);
+                return Ok(response);
             }
 
             return NotFound(new { Error = "Investment not found" });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(ex, "Invalid investment ID format: {InvestmentId}", investmentId);
+            return BadRequest(new { Error = "Invalid investment ID format" });
         }
         catch (Exception ex)
         {
@@ -127,61 +147,75 @@ public class InvestmentsController : ControllerBase
             return StatusCode(500, new { Error = "Internal server error" });
         }
     }
-}
 
-/// <summary>
-/// Request model for adding an investment.
-/// </summary>
-public record AddInvestmentRequest
-{
-    /// <summary>Gets or sets the portfolio ID</summary>
-    public string PortfolioId { get; set; } = string.Empty;
+    /// <summary>
+    /// Deletes an investment.
+    /// </summary>
+    /// <param name="investmentId">The investment ID</param>
+    /// <returns>The result of the operation</returns>
+    [HttpDelete("{investmentId}")]
+    public async Task<IActionResult> DeleteInvestment([FromRoute] string investmentId)
+    {
+        try
+        {
+            var command = new DeleteInvestmentCommand(InvestmentId.FromString(investmentId));
+            var result = await _mediator.Send(command);
 
-    /// <summary>Gets or sets the symbol information</summary>
-    public SymbolRequest Symbol { get; set; } = new();
+            if (result.IsSuccess)
+            {
+                return Ok(new { Message = "Investment deleted successfully" });
+            }
 
-    /// <summary>Gets or sets the purchase price</summary>
-    public MoneyRequest PurchasePrice { get; set; } = new();
+            return BadRequest(new { Error = result.ErrorMessage });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(ex, "Invalid investment ID format: {InvestmentId}", investmentId);
+            return BadRequest(new { Error = "Invalid investment ID format" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting investment");
+            return StatusCode(500, new { Error = "Internal server error" });
+        }
+    }
 
-    /// <summary>Gets or sets the quantity</summary>
-    public decimal Quantity { get; set; }
+    /// <summary>
+    /// Updates an investment (quantity, purchase price, etc.).
+    /// </summary>
+    /// <param name="investmentId">The investment ID</param>
+    /// <param name="request">The update investment request</param>
+    /// <returns>The result of the operation</returns>
+    [HttpPut("{investmentId}")]
+    public async Task<IActionResult> UpdateInvestment([FromRoute] string investmentId, [FromBody] UpdateInvestmentRequest request)
+    {
+        try
+        {
+            var command = new UpdateInvestmentCommand(
+                InvestmentId.FromString(investmentId),
+                request.PurchasePrice != null
+                    ? new Money(request.PurchasePrice.Amount, Enum.Parse<Currency>(request.PurchasePrice.Currency))
+                    : null,
+                request.Quantity);
 
-    /// <summary>Gets or sets the purchase date</summary>
-    public DateTime PurchaseDate { get; set; }
-}
+            var result = await _mediator.Send(command);
 
-/// <summary>
-/// Request model for updating investment value.
-/// </summary>
-public record UpdateInvestmentValueRequest
-{
-    /// <summary>Gets or sets the current price</summary>
-    public MoneyRequest CurrentPrice { get; set; } = new();
-}
+            if (result.IsSuccess)
+            {
+                return Ok(new { Message = "Investment updated successfully" });
+            }
 
-/// <summary>
-/// Request model for symbol information.
-/// </summary>
-public record SymbolRequest
-{
-    /// <summary>Gets or sets the ticker symbol</summary>
-    public string Ticker { get; set; } = string.Empty;
-
-    /// <summary>Gets or sets the exchange</summary>
-    public string Exchange { get; set; } = string.Empty;
-
-    /// <summary>Gets or sets the asset type</summary>
-    public string AssetType { get; set; } = string.Empty;
-}
-
-/// <summary>
-/// Request model for money information.
-/// </summary>
-public record MoneyRequest
-{
-    /// <summary>Gets or sets the amount</summary>
-    public decimal Amount { get; set; }
-
-    /// <summary>Gets or sets the currency</summary>
-    public string Currency { get; set; } = string.Empty;
+            return BadRequest(new { Error = result.ErrorMessage });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(ex, "Invalid investment ID format: {InvestmentId}", investmentId);
+            return BadRequest(new { Error = "Invalid investment ID format" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating investment");
+            return StatusCode(500, new { Error = "Internal server error" });
+        }
+    }
 }

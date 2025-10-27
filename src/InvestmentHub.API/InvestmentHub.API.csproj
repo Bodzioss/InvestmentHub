@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MediatR" Version="13.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10" />
     
     <!-- Database and Cache -->
@@ -28,6 +29,7 @@
     <ProjectReference Include="..\InvestmentHub.Infrastructure\InvestmentHub.Infrastructure.csproj" />
     <ProjectReference Include="..\InvestmentHub.Web\InvestmentHub.Web.csproj" />
     <ProjectReference Include="..\..\host\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\InvestmentHub.Domain\InvestmentHub.Domain.csproj" />
   </ItemGroup>
 
 </Project>

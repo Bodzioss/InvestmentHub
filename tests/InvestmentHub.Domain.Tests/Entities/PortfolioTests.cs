@@ -450,6 +450,6 @@ public class PortfolioTests
         var quantity = 10m;
         var purchaseDate = DateTime.UtcNow.AddDays(-30);
         
-        return new Investment(investmentId, symbol, purchasePrice, quantity, purchaseDate);
+        return new Investment(investmentId, PortfolioId.New(), symbol, purchasePrice, quantity, purchaseDate);
     }
 }

@@ -51,6 +51,7 @@ public class DomainEventExample
         
         var investment = new Investment(
             investmentId,
+            portfolioId,
             symbol,
             purchasePrice,
             quantity,

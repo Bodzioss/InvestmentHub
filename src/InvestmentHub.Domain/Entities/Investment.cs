@@ -15,6 +15,11 @@ public class Investment
     public InvestmentId Id { get; }
     
     /// <summary>
+    /// Gets the unique identifier of the portfolio this investment belongs to.
+    /// </summary>
+    public PortfolioId PortfolioId { get; }
+    
+    /// <summary>
     /// Gets the financial symbol representing the investment.
     /// </summary>
     public Symbol Symbol { get; }
@@ -27,7 +32,7 @@ public class Investment
     /// <summary>
     /// Gets the original purchase price per unit.
     /// </summary>
-    public Money PurchasePrice { get; }
+    public Money PurchasePrice { get; private set; }
     
     /// <summary>
     /// Gets the quantity of units held.
@@ -37,7 +42,7 @@ public class Investment
     /// <summary>
     /// Gets the date when the investment was purchased.
     /// </summary>
-    public DateTime PurchaseDate { get; }
+    public DateTime PurchaseDate { get; private set; }
     
     /// <summary>
     /// Gets the date when the investment was last updated.
@@ -53,12 +58,13 @@ public class Investment
     /// Initializes a new instance of the Investment class.
     /// </summary>
     /// <param name="id">Unique identifier for the investment</param>
+    /// <param name="portfolioId">Unique identifier of the portfolio this investment belongs to</param>
     /// <param name="symbol">Financial symbol representing the investment</param>
     /// <param name="purchasePrice">Price per unit at purchase</param>
     /// <param name="quantity">Number of units purchased</param>
     /// <param name="purchaseDate">Date of purchase</param>
     /// <exception cref="ArgumentException">Thrown when quantity is not positive or purchase date is in the future</exception>
-    public Investment(InvestmentId id, Symbol symbol, Money purchasePrice, decimal quantity, DateTime purchaseDate)
+    public Investment(InvestmentId id, PortfolioId portfolioId, Symbol symbol, Money purchasePrice, decimal quantity, DateTime purchaseDate)
     {
         if (quantity <= 0)
             throw new ArgumentException("Quantity must be positive", nameof(quantity));
@@ -67,6 +73,7 @@ public class Investment
             throw new ArgumentException("Purchase date cannot be in the future", nameof(purchaseDate));
         
         Id = id ?? throw new ArgumentNullException(nameof(id));
+        PortfolioId = portfolioId ?? throw new ArgumentNullException(nameof(portfolioId));
         Symbol = symbol ?? throw new ArgumentNullException(nameof(symbol));
         PurchasePrice = purchasePrice ?? throw new ArgumentNullException(nameof(purchasePrice));
         Quantity = quantity;
@@ -115,6 +122,38 @@ public class Investment
         
         // Recalculate current value based on new quantity and current price per unit
         CurrentValue = new Money(currentPricePerUnit * newQuantity, CurrentValue.Currency);
+    }
+
+    /// <summary>
+    /// Updates the purchase price of the investment.
+    /// </summary>
+    /// <param name="newPurchasePrice">New purchase price per unit</param>
+    /// <exception cref="InvalidOperationException">Thrown when investment is not active</exception>
+    public void UpdatePurchasePrice(Money newPurchasePrice)
+    {
+        if (Status != InvestmentStatus.Active)
+            throw new InvalidOperationException("Cannot update purchase price of inactive investment");
+        
+        PurchasePrice = newPurchasePrice;
+        LastUpdated = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Updates the purchase date of the investment.
+    /// </summary>
+    /// <param name="newPurchaseDate">New purchase date</param>
+    /// <exception cref="InvalidOperationException">Thrown when investment is not active</exception>
+    /// <exception cref="ArgumentException">Thrown when purchase date is in the future</exception>
+    public void UpdatePurchaseDate(DateTime newPurchaseDate)
+    {
+        if (Status != InvestmentStatus.Active)
+            throw new InvalidOperationException("Cannot update purchase date of inactive investment");
+        
+        if (newPurchaseDate > DateTime.UtcNow)
+            throw new ArgumentException("Purchase date cannot be in the future", nameof(newPurchaseDate));
+        
+        PurchaseDate = newPurchaseDate;
+        LastUpdated = DateTime.UtcNow;
     }
     
     /// <summary>

@@ -439,6 +439,6 @@ public class PortfolioValuationServiceTests
         var purchasePrice = new Money(price, Currency.USD);
         var purchaseDate = DateTime.UtcNow.AddDays(-30);
         
-        return new Investment(investmentId, symbol, purchasePrice, quantity, purchaseDate);
+        return new Investment(investmentId, PortfolioId.New(), symbol, purchasePrice, quantity, purchaseDate);
     }
 }

@@ -1,8 +1,15 @@
 using Microsoft.OpenApi.Models;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using InvestmentHub.Web.Data;
+using InvestmentHub.Infrastructure.Data;
+using InvestmentHub.Infrastructure.Data.Repositories;
+using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Domain.Services;
 using Microsoft.EntityFrameworkCore;
+using MediatR;
+using InvestmentHub.Domain.Handlers.Commands;
+using InvestmentHub.Domain.Handlers.Queries;
+using InvestmentHub.Domain.Behaviors;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +20,14 @@ builder.AddNpgsqlDbContext<ApplicationDbContext>("postgres", configureDbContextO
 {
     options.UseNpgsql();
 });
+
+// Register repositories
+builder.Services.AddScoped<IInvestmentRepository, InvestmentRepository>();
+builder.Services.AddScoped<IPortfolioRepository, PortfolioRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+
+// Register domain services
+builder.Services.AddScoped<IPortfolioValuationService, PortfolioValuationService>();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -32,6 +47,18 @@ builder.Services.AddAutoMapper(typeof(Program));
 // Add FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
+
+// Add MediatR
+builder.Services.AddMediatR(cfg =>
+{
+    // Register all handlers from the Domain assembly
+    cfg.RegisterServicesFromAssembly(typeof(AddInvestmentCommandHandler).Assembly);
+    
+    // Register pipeline behaviors
+    cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+    cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
+    cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+});
 
 var app = builder.Build();
 

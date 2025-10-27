@@ -18,6 +18,7 @@ namespace InvestmentHub.Domain.Tests.Entities;
 public class InvestmentTests
 {
     private readonly InvestmentId _investmentId;
+    private readonly PortfolioId _portfolioId;
     private readonly Symbol _symbol;
     private readonly Money _purchasePrice;
     private readonly decimal _quantity;
@@ -26,6 +27,7 @@ public class InvestmentTests
     public InvestmentTests()
     {
         _investmentId = InvestmentId.New();
+        _portfolioId = PortfolioId.New();
         _symbol = Symbol.Stock("AAPL", "NASDAQ");
         _purchasePrice = new Money(150.00m, Currency.USD);
         _quantity = 10m;
@@ -36,7 +38,7 @@ public class InvestmentTests
     public void Constructor_WithValidParameters_ShouldCreateInvestment()
     {
         // Arrange & Act
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         
         // Assert
         investment.Id.Should().Be(_investmentId);
@@ -52,7 +54,7 @@ public class InvestmentTests
     public void Constructor_WithZeroQuantity_ShouldThrowArgumentException()
     {
         // Arrange & Act
-        var action = () => new Investment(_investmentId, _symbol, _purchasePrice, 0m, _purchaseDate);
+        var action = () => new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, 0m, _purchaseDate);
         
         // Assert
         action.Should().Throw<ArgumentException>()
@@ -64,7 +66,7 @@ public class InvestmentTests
     public void Constructor_WithNegativeQuantity_ShouldThrowArgumentException()
     {
         // Arrange & Act
-        var action = () => new Investment(_investmentId, _symbol, _purchasePrice, -5m, _purchaseDate);
+        var action = () => new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, -5m, _purchaseDate);
         
         // Assert
         action.Should().Throw<ArgumentException>()
@@ -79,7 +81,7 @@ public class InvestmentTests
         var futureDate = DateTime.UtcNow.AddDays(1);
         
         // Act
-        var action = () => new Investment(_investmentId, _symbol, _purchasePrice, _quantity, futureDate);
+        var action = () => new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, futureDate);
         
         // Assert
         action.Should().Throw<ArgumentException>()
@@ -91,7 +93,7 @@ public class InvestmentTests
     public void Constructor_WithNullId_ShouldThrowArgumentNullException()
     {
         // Arrange & Act
-        var action = () => new Investment(null!, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var action = () => new Investment(null!, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         
         // Assert
         action.Should().Throw<ArgumentNullException>()
@@ -102,7 +104,7 @@ public class InvestmentTests
     public void Constructor_WithNullSymbol_ShouldThrowArgumentNullException()
     {
         // Arrange & Act
-        var action = () => new Investment(_investmentId, null!, _purchasePrice, _quantity, _purchaseDate);
+        var action = () => new Investment(_investmentId, _portfolioId, null!, _purchasePrice, _quantity, _purchaseDate);
         
         // Assert
         action.Should().Throw<ArgumentNullException>()
@@ -113,7 +115,7 @@ public class InvestmentTests
     public void Constructor_WithNullPurchasePrice_ShouldThrowArgumentNullException()
     {
         // Arrange & Act
-        var action = () => new Investment(_investmentId, _symbol, null!, _quantity, _purchaseDate);
+        var action = () => new Investment(_investmentId, _portfolioId, _symbol, null!, _quantity, _purchaseDate);
         
         // Assert
         action.Should().Throw<ArgumentNullException>()
@@ -124,7 +126,7 @@ public class InvestmentTests
     public void UpdateCurrentValue_WithValidPrice_ShouldUpdateCurrentValue()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var newPrice = new Money(160.00m, Currency.USD);
         var expectedNewValue = newPrice.Multiply(_quantity);
         
@@ -140,7 +142,7 @@ public class InvestmentTests
     public void UpdateCurrentValue_WithValidPrice_ShouldUpdateValue()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var newPrice = new Money(10m, Currency.USD);
         var expectedValue = newPrice.Multiply(_quantity);
         
@@ -156,7 +158,7 @@ public class InvestmentTests
     public void UpdateCurrentValue_OnSoldInvestment_ShouldThrowInvalidOperationException()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         investment.MarkAsSold();
         var newPrice = new Money(160.00m, Currency.USD);
         
@@ -172,7 +174,7 @@ public class InvestmentTests
     public void UpdateQuantity_WithValidQuantity_ShouldUpdateQuantity()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var newQuantity = 15m;
         var expectedNewValue = _purchasePrice.Multiply(newQuantity);
         
@@ -189,7 +191,7 @@ public class InvestmentTests
     public void UpdateQuantity_WithZeroQuantity_ShouldThrowArgumentException()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         
         // Act
         var action = () => investment.UpdateQuantity(0m);
@@ -204,7 +206,7 @@ public class InvestmentTests
     public void UpdateQuantity_OnSoldInvestment_ShouldThrowInvalidOperationException()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         investment.MarkAsSold();
         
         // Act
@@ -219,7 +221,7 @@ public class InvestmentTests
     public void MarkAsSold_OnActiveInvestment_ShouldChangeStatusToSold()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         
         // Act
         investment.MarkAsSold();
@@ -233,7 +235,7 @@ public class InvestmentTests
     public void MarkAsSold_OnAlreadySoldInvestment_ShouldThrowInvalidOperationException()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         investment.MarkAsSold();
         
         // Act
@@ -248,7 +250,7 @@ public class InvestmentTests
     public void Suspend_OnActiveInvestment_ShouldChangeStatusToSuspended()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         
         // Act
         investment.Suspend();
@@ -262,7 +264,7 @@ public class InvestmentTests
     public void Suspend_OnSoldInvestment_ShouldThrowInvalidOperationException()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         investment.MarkAsSold();
         
         // Act
@@ -277,7 +279,7 @@ public class InvestmentTests
     public void GetTotalCost_ShouldReturnPurchasePriceTimesQuantity()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var expectedTotalCost = _purchasePrice.Multiply(_quantity);
         
         // Act
@@ -291,7 +293,7 @@ public class InvestmentTests
     public void GetUnrealizedGainLoss_WithHigherCurrentValue_ShouldReturnPositiveGain()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var higherPrice = new Money(160.00m, Currency.USD);
         investment.UpdateCurrentValue(higherPrice);
         
@@ -307,7 +309,7 @@ public class InvestmentTests
     public void GetUnrealizedGainLoss_WithLowerCurrentValue_ShouldReturnNegativeLoss()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var lowerPrice = new Money(140.00m, Currency.USD);
         investment.UpdateCurrentValue(lowerPrice);
         
@@ -325,7 +327,7 @@ public class InvestmentTests
     public void GetPercentageGainLoss_WithGain_ShouldReturnPositivePercentage()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var higherPrice = new Money(165.00m, Currency.USD); // 10% gain
         investment.UpdateCurrentValue(higherPrice);
         
@@ -340,7 +342,7 @@ public class InvestmentTests
     public void GetPercentageGainLoss_WithLoss_ShouldReturnNegativePercentage()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var lowerPrice = new Money(135.00m, Currency.USD); // 10% loss
         investment.UpdateCurrentValue(lowerPrice);
         
@@ -355,7 +357,7 @@ public class InvestmentTests
     public void IsProfitable_WithGain_ShouldReturnTrue()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var higherPrice = new Money(160.00m, Currency.USD);
         investment.UpdateCurrentValue(higherPrice);
         
@@ -370,7 +372,7 @@ public class InvestmentTests
     public void IsProfitable_WithLoss_ShouldReturnFalse()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         var lowerPrice = new Money(140.00m, Currency.USD);
         investment.UpdateCurrentValue(lowerPrice);
         
@@ -385,7 +387,7 @@ public class InvestmentTests
     public void ToString_ShouldReturnFormattedString()
     {
         // Arrange
-        var investment = new Investment(_investmentId, _symbol, _purchasePrice, _quantity, _purchaseDate);
+        var investment = new Investment(_investmentId, _portfolioId, _symbol, _purchasePrice, _quantity, _purchaseDate);
         
         // Act
         var result = investment.ToString();

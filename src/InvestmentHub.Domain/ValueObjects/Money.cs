@@ -81,6 +81,20 @@ public class Money : IEquatable<Money>
         
         return new Money(Amount * factor, Currency);
     }
+
+    /// <summary>
+    /// Divides the money amount by a divisor.
+    /// </summary>
+    /// <param name="divisor">The divisor to divide by</param>
+    /// <returns>A new Money instance with the divided amount</returns>
+    /// <exception cref="ArgumentException">Thrown when divisor is zero or negative</exception>
+    public Money Divide(decimal divisor)
+    {
+        if (divisor <= 0)
+            throw new ArgumentException("Divisor must be positive", nameof(divisor));
+        
+        return new Money(Amount / divisor, Currency);
+    }
     
     /// <summary>
     /// Determines whether this Money instance equals another Money instance.

@@ -1,4 +1,5 @@
 using InvestmentHub.Domain.Entities;
+using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.Events;
 using InvestmentHub.Domain.ValueObjects;
 
@@ -211,25 +212,4 @@ public class PortfolioRiskAnalysis
         RiskScore = riskScore;
         RiskLevel = riskLevel;
     }
-}
-
-/// <summary>
-/// Represents different risk levels for portfolio classification.
-/// </summary>
-public enum RiskLevel
-{
-    /// <summary>Very low risk</summary>
-    VeryLow,
-    
-    /// <summary>Low risk</summary>
-    Low,
-    
-    /// <summary>Moderate risk</summary>
-    Moderate,
-    
-    /// <summary>High risk</summary>
-    High,
-    
-    /// <summary>Very high risk</summary>
-    VeryHigh
 }

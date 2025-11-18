@@ -1,12 +1,12 @@
-using InvestmentHub.Domain.Entities;
+using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Domain.ValueObjects;
 using MediatR;
 
 namespace InvestmentHub.Domain.Queries;
 
 /// <summary>
-/// Query to get a portfolio by its ID.
-/// This represents a read operation that retrieves portfolio data.
+/// Query to get a portfolio by its ID from the read model.
+/// This represents a read operation that retrieves portfolio data optimized for queries.
 /// </summary>
 public record GetPortfolioQuery : IRequest<GetPortfolioResult>
 {
@@ -41,16 +41,16 @@ public record GetPortfolioResult
     public string? ErrorMessage { get; init; }
 
     /// <summary>
-    /// Gets the portfolio data.
+    /// Gets the portfolio read model data.
     /// </summary>
-    public Portfolio? Portfolio { get; init; }
+    public PortfolioReadModel? Portfolio { get; init; }
 
     /// <summary>
     /// Creates a successful result.
     /// </summary>
-    /// <param name="portfolio">The portfolio data</param>
+    /// <param name="portfolio">The portfolio read model data</param>
     /// <returns>A successful result</returns>
-    public static GetPortfolioResult Success(Portfolio portfolio) =>
+    public static GetPortfolioResult Success(PortfolioReadModel portfolio) =>
         new() { IsSuccess = true, Portfolio = portfolio };
 
     /// <summary>

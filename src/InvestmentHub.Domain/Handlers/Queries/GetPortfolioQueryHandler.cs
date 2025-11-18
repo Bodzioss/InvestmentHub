@@ -1,35 +1,36 @@
-using InvestmentHub.Domain.Entities;
 using InvestmentHub.Domain.Queries;
-using InvestmentHub.Domain.ValueObjects;
-using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Domain.ReadModels;
 using MediatR;
+using Marten;
+using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Domain.Handlers.Queries;
 
 /// <summary>
 /// Handler for GetPortfolioQuery.
-/// Responsible for retrieving portfolio data with full business logic.
+/// Responsible for retrieving portfolio data from the read model using Marten.
 /// </summary>
 public class GetPortfolioQueryHandler : IRequestHandler<GetPortfolioQuery, GetPortfolioResult>
 {
-    private readonly IPortfolioRepository _portfolioRepository;
-    private readonly IInvestmentRepository _investmentRepository;
+    private readonly IDocumentSession _session;
+    private readonly ILogger<GetPortfolioQueryHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of the GetPortfolioQueryHandler class.
     /// </summary>
-    /// <param name="portfolioRepository">The portfolio repository</param>
-    /// <param name="investmentRepository">The investment repository</param>
+    /// <param name="session">The Marten document session</param>
+    /// <param name="logger">The logger</param>
     public GetPortfolioQueryHandler(
-        IPortfolioRepository portfolioRepository,
-        IInvestmentRepository investmentRepository)
+        IDocumentSession session,
+        ILogger<GetPortfolioQueryHandler> logger)
     {
-        _portfolioRepository = portfolioRepository ?? throw new ArgumentNullException(nameof(portfolioRepository));
-        _investmentRepository = investmentRepository ?? throw new ArgumentNullException(nameof(investmentRepository));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Handles the GetPortfolioQuery.
+    /// Handles the GetPortfolioQuery by reading from the PortfolioReadModel.
+    /// This is a fast read operation against the denormalized read model.
     /// </summary>
     /// <param name="request">The query request</param>
     /// <param name="cancellationToken">The cancellation token</param>
@@ -38,38 +39,36 @@ public class GetPortfolioQueryHandler : IRequestHandler<GetPortfolioQuery, GetPo
     {
         try
         {
+            _logger.LogInformation("Querying portfolio {PortfolioId} from read model", request.PortfolioId.Value);
+
             // Check for cancellation
             cancellationToken.ThrowIfCancellationRequested();
             
-            // 1. Load portfolio from repository
-            var portfolio = await _portfolioRepository.GetByIdAsync(request.PortfolioId, cancellationToken);
+            // Load portfolio read model from Marten document store
+            // This is a fast query against the denormalized read model
+            var portfolio = await _session.LoadAsync<PortfolioReadModel>(request.PortfolioId.Value, cancellationToken);
+            
             if (portfolio == null)
             {
+                _logger.LogWarning("Portfolio {PortfolioId} not found in read model", request.PortfolioId.Value);
                 return GetPortfolioResult.Failure("Portfolio not found");
             }
 
-            // 2. Load investments for the portfolio
-            var investments = await _investmentRepository.GetByPortfolioIdAsync(request.PortfolioId, cancellationToken);
-            
-            // 3. Add investments to portfolio (if not already loaded)
-            foreach (var investment in investments)
-            {
-                if (!portfolio.Investments.Any(i => i.Id == investment.Id))
-                {
-                    portfolio.AddInvestment(investment);
-                }
-            }
+            _logger.LogInformation("Successfully retrieved portfolio {PortfolioId} (Version: {Version})", 
+                portfolio.Id, portfolio.Version);
 
-            // 4. Return success with portfolio
             return GetPortfolioResult.Success(portfolio);
         }
         catch (OperationCanceledException)
         {
+            _logger.LogInformation("Portfolio query cancelled for {PortfolioId}", request.PortfolioId.Value);
             // Re-throw cancellation exceptions
             throw;
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to retrieve portfolio {PortfolioId}: {Message}", 
+                request.PortfolioId.Value, ex.Message);
             return GetPortfolioResult.Failure($"Failed to retrieve portfolio: {ex.Message}");
         }
     }

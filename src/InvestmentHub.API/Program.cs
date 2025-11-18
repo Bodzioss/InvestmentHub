@@ -14,6 +14,7 @@ using InvestmentHub.Domain.Validators;
 using InvestmentHub.API.Mapping;
 using Marten;
 using Marten.Events;
+using InvestmentHub.Domain.Projections;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +34,9 @@ builder.Services.AddMarten(options =>
     
     // Use Guid as stream identity (recommended for new projects)
     options.Events.StreamIdentity = StreamIdentity.AsGuid;
+    
+    // Register projections
+    options.Projections.Add<PortfolioProjection>(Marten.Events.Projections.ProjectionLifecycle.Inline);
     
     // Configure database schema (optional - Marten will auto-create if needed)
     if (builder.Environment.IsDevelopment())

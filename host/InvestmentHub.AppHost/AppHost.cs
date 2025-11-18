@@ -1,10 +1,10 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Add PostgreSQL database
+// Add PostgreSQL database - Aspire will manage containers
 var postgres = builder.AddPostgres("postgres")
     .WithDataVolume();
 
-// Add Redis cache
+// Add Redis cache - Aspire will manage containers
 var redis = builder.AddRedis("redis")
     .WithDataVolume();
 

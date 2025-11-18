@@ -117,6 +117,31 @@ public class InvestmentMappingProfile : Profile
             }))
             .ForMember(dest => dest.ActiveInvestmentCount, opt => opt.MapFrom(src => src.Investments.Count));
 
+        // Map PortfolioReadModel to PortfolioResponseDto (for queries from read model)
+        CreateMap<InvestmentHub.Domain.ReadModels.PortfolioReadModel, PortfolioResponseDto>()
+            .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.ToString()))
+            .ForMember(dest => dest.OwnerId, opt => opt.MapFrom(src => src.OwnerId.ToString()))
+            .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name))
+            .ForMember(dest => dest.Description, opt => opt.MapFrom(src => src.Description))
+            .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(src => src.CreatedAt))
+            .ForMember(dest => dest.LastUpdated, opt => opt.MapFrom(src => src.LastUpdated))
+            .ForMember(dest => dest.TotalValue, opt => opt.MapFrom(src => new MoneyResponseDto
+            {
+                Amount = src.TotalValue,
+                Currency = src.Currency
+            }))
+            .ForMember(dest => dest.TotalCost, opt => opt.MapFrom(src => new MoneyResponseDto
+            {
+                Amount = 0, // Not yet calculated in read model
+                Currency = src.Currency
+            }))
+            .ForMember(dest => dest.UnrealizedGainLoss, opt => opt.MapFrom(src => new MoneyResponseDto
+            {
+                Amount = 0, // Not yet calculated in read model
+                Currency = src.Currency
+            }))
+            .ForMember(dest => dest.ActiveInvestmentCount, opt => opt.MapFrom(src => src.InvestmentCount));
+
         CreateMap<User, UserResponseDto>()
             .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.Value.ToString()));
     }

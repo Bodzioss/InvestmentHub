@@ -2,25 +2,62 @@ using InvestmentHub.Domain.Commands;
 using InvestmentHub.Domain.Handlers.Commands;
 using InvestmentHub.Domain.ValueObjects;
 using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Domain.Entities;
 using FluentAssertions;
 using Xunit;
 using Moq;
+using Marten;
+using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Domain.Tests.Handlers.Commands;
 
 /// <summary>
 /// Unit tests for CreatePortfolioCommandHandler.
-/// Tests the business logic for creating new portfolios.
+/// Tests the business logic for creating new portfolios with Marten event sourcing.
 /// </summary>
 public class CreatePortfolioCommandHandlerTests
 {
     private readonly CreatePortfolioCommandHandler _handler;
+    private readonly Mock<IDocumentSession> _sessionMock;
+    private readonly Mock<IUserRepository> _userRepositoryMock;
+    private readonly Mock<IPortfolioRepository> _portfolioRepositoryMock;
+    private readonly Mock<ILogger<CreatePortfolioCommandHandler>> _loggerMock;
 
     public CreatePortfolioCommandHandlerTests()
     {
-        var portfolioRepository = new Mock<IPortfolioRepository>();
-        var userRepository = new Mock<IUserRepository>();
-        _handler = new CreatePortfolioCommandHandler(portfolioRepository.Object, userRepository.Object);
+        _sessionMock = new Mock<IDocumentSession>();
+        _userRepositoryMock = new Mock<IUserRepository>();
+        _portfolioRepositoryMock = new Mock<IPortfolioRepository>();
+        _loggerMock = new Mock<ILogger<CreatePortfolioCommandHandler>>();
+
+        // Setup default successful responses
+        _userRepositoryMock
+            .Setup(x => x.GetByIdAsync(It.IsAny<UserId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User(UserId.New(), "Test User", "test@test.com", DateTime.UtcNow));
+        
+        _userRepositoryMock
+            .Setup(x => x.CanCreatePortfolioAsync(It.IsAny<UserId>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        
+        _portfolioRepositoryMock
+            .Setup(x => x.ExistsByNameAsync(It.IsAny<UserId>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        // Setup Marten event store mock
+        var eventStoreMock = new Mock<Marten.Events.IEventStore>();
+        _sessionMock
+            .Setup(x => x.Events)
+            .Returns(eventStoreMock.Object);
+        
+        _sessionMock
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _handler = new CreatePortfolioCommandHandler(
+            _sessionMock.Object,
+            _userRepositoryMock.Object,
+            _portfolioRepositoryMock.Object,
+            _loggerMock.Object);
     }
 
     [Fact]

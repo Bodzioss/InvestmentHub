@@ -12,6 +12,8 @@ using InvestmentHub.Domain.Handlers.Queries;
 using InvestmentHub.Domain.Behaviors;
 using InvestmentHub.Domain.Validators;
 using InvestmentHub.API.Mapping;
+using Marten;
+using Marten.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +23,22 @@ builder.AddServiceDefaults();
 builder.AddNpgsqlDbContext<ApplicationDbContext>("postgres", configureDbContextOptions: options =>
 {
     options.UseNpgsql();
+});
+
+// Configure Marten for Event Sourcing
+var connectionString = builder.Configuration.GetConnectionString("postgres");
+builder.Services.AddMarten(options =>
+{
+    options.Connection(connectionString!);
+    
+    // Use Guid as stream identity (recommended for new projects)
+    options.Events.StreamIdentity = StreamIdentity.AsGuid;
+    
+    // Configure database schema (optional - Marten will auto-create if needed)
+    if (builder.Environment.IsDevelopment())
+    {
+        options.AutoCreateSchemaObjects = Weasel.Core.AutoCreate.All;
+    }
 });
 
 // Register repositories

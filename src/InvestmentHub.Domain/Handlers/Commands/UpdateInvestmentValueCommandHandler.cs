@@ -1,6 +1,8 @@
 using InvestmentHub.Domain.Commands;
 using InvestmentHub.Domain.ValueObjects;
+using InvestmentHub.Domain.Repositories;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Domain.Handlers.Commands;
 
@@ -10,7 +12,21 @@ namespace InvestmentHub.Domain.Handlers.Commands;
 /// </summary>
 public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestmentValueCommand, UpdateInvestmentValueResult>
 {
-    // In a real application, this would inject repositories and services
+    private readonly IInvestmentRepository _investmentRepository;
+    private readonly ILogger<UpdateInvestmentValueCommandHandler> _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the UpdateInvestmentValueCommandHandler class.
+    /// </summary>
+    /// <param name="investmentRepository">The investment repository</param>
+    /// <param name="logger">The logger</param>
+    public UpdateInvestmentValueCommandHandler(
+        IInvestmentRepository investmentRepository,
+        ILogger<UpdateInvestmentValueCommandHandler> logger)
+    {
+        _investmentRepository = investmentRepository;
+        _logger = logger;
+    }
 
     /// <summary>
     /// Handles the UpdateInvestmentValueCommand.
@@ -22,24 +38,39 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
     {
         try
         {
-            // In a real application, you would:
+            _logger.LogInformation("Updating investment value for {InvestmentId}", request.InvestmentId.Value);
+
             // 1. Load the investment from repository
-            // 2. Validate investment exists and is active
-            // 3. Update the current value
-            // 4. Save changes
-            // 5. Publish domain events
+            var investment = await _investmentRepository.GetByIdAsync(request.InvestmentId, cancellationToken);
+            
+            if (investment == null)
+            {
+                _logger.LogWarning("Investment {InvestmentId} not found", request.InvestmentId.Value);
+                return UpdateInvestmentValueResult.Failure("Investment not found");
+            }
 
-            // Simulate async operation
-            await Task.Delay(10, cancellationToken);
+            // 2. Update the current value
+            investment.UpdateCurrentValue(request.CurrentPrice);
 
-            // Simulate finding the investment and updating its value
-            // In real app, this would be: investment.UpdateCurrentValue(request.CurrentPrice);
-            var updatedValue = request.CurrentPrice.Multiply(10m); // Simulate quantity of 10
+            // 3. Save changes
+            await _investmentRepository.UpdateAsync(investment, cancellationToken);
 
-            return UpdateInvestmentValueResult.Success(updatedValue);
+            _logger.LogInformation("Successfully updated investment {InvestmentId} to {CurrentValue}", 
+                request.InvestmentId.Value, investment.CurrentValue);
+
+            // 4. Return success with the new total value
+            return UpdateInvestmentValueResult.Success(investment.CurrentValue);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Cannot update investment {InvestmentId}: {Message}", 
+                request.InvestmentId.Value, ex.Message);
+            return UpdateInvestmentValueResult.Failure(ex.Message);
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to update investment value for {InvestmentId}", 
+                request.InvestmentId.Value);
             return UpdateInvestmentValueResult.Failure($"Failed to update investment value: {ex.Message}");
         }
     }

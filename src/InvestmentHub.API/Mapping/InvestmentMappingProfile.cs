@@ -6,6 +6,7 @@ using InvestmentHub.Domain.Enums;
 using InvestmentHub.API.Controllers;
 using InvestmentHub.API.DTOs;
 using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Domain.Queries;
 
 namespace InvestmentHub.API.Mapping;
 
@@ -21,25 +22,60 @@ public class InvestmentMappingProfile : Profile
     {
         // Request DTOs to Commands
         CreateMap<AddInvestmentRequest, AddInvestmentCommand>()
-            .ForMember(dest => dest.PortfolioId, opt => opt.MapFrom(src => PortfolioId.FromString(src.PortfolioId)))
-            .ForMember(dest => dest.Symbol, opt => opt.MapFrom(src => new Symbol(
-                src.Symbol.Ticker,
-                src.Symbol.Exchange,
-                Enum.Parse<AssetType>(src.Symbol.AssetType))))
-            .ForMember(dest => dest.PurchasePrice, opt => opt.MapFrom(src => new Money(
-                src.PurchasePrice.Amount,
-                Enum.Parse<Currency>(src.PurchasePrice.Currency))));
+            .ConstructUsing(src => new AddInvestmentCommand(
+                PortfolioId.FromString(src.PortfolioId),
+                new Symbol(
+                    src.Symbol.Ticker,
+                    src.Symbol.Exchange,
+                    Enum.Parse<AssetType>(src.Symbol.AssetType)),
+                new Money(
+                    src.PurchasePrice.Amount,
+                    Enum.Parse<Currency>(src.PurchasePrice.Currency)),
+                src.Quantity,
+                src.PurchaseDate))
+            .ForAllMembers(opt => opt.Ignore());
 
         CreateMap<UpdateInvestmentValueRequest, UpdateInvestmentValueCommand>()
-            .ForMember(dest => dest.InvestmentId, opt => opt.MapFrom(src => InvestmentId.FromString(src.InvestmentId)))
-            .ForMember(dest => dest.CurrentPrice, opt => opt.MapFrom(src => new Money(
-                src.CurrentPrice.Amount,
-                Enum.Parse<Currency>(src.CurrentPrice.Currency))));
+            .ConstructUsing(src => new UpdateInvestmentValueCommand(
+                InvestmentId.FromString(src.InvestmentId),
+                new Money(
+                    src.CurrentPrice.Amount,
+                    Enum.Parse<Currency>(src.CurrentPrice.Currency))))
+            .ForAllMembers(opt => opt.Ignore());
 
         CreateMap<CreatePortfolioRequest, CreatePortfolioCommand>()
-            .ForMember(dest => dest.OwnerId, opt => opt.MapFrom(src => UserId.FromString(src.OwnerId)));
+            .ConstructUsing(src => new CreatePortfolioCommand(
+                PortfolioId.New(),
+                UserId.FromString(src.OwnerId),
+                src.Name,
+                src.Description))
+            .ForAllMembers(opt => opt.Ignore());
 
         // Domain entities to Response DTOs
+        CreateMap<InvestmentSummary, InvestmentResponseDto>()
+            .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.Value.ToString()))
+            .ForMember(dest => dest.PortfolioId, opt => opt.Ignore()) // Will be set in controller
+            .ForMember(dest => dest.Symbol, opt => opt.MapFrom(src => new SymbolResponseDto
+            {
+                Ticker = src.Symbol.Ticker,
+                Exchange = src.Symbol.Exchange,
+                AssetType = src.Symbol.AssetType.ToString()
+            }))
+            .ForMember(dest => dest.CurrentValue, opt => opt.MapFrom(src => new MoneyResponseDto
+            {
+                Amount = src.CurrentValue.Amount,
+                Currency = src.CurrentValue.Currency.ToString()
+            }))
+            .ForMember(dest => dest.PurchasePrice, opt => opt.MapFrom(src => new MoneyResponseDto
+            {
+                Amount = src.PurchasePrice.Amount,
+                Currency = src.PurchasePrice.Currency.ToString()
+            }))
+            .ForMember(dest => dest.Quantity, opt => opt.MapFrom(src => src.Quantity))
+            .ForMember(dest => dest.PurchaseDate, opt => opt.MapFrom(src => src.PurchaseDate))
+            .ForMember(dest => dest.LastUpdated, opt => opt.MapFrom(src => src.LastUpdated))
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
+
         CreateMap<Investment, InvestmentResponseDto>()
             .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.Value.ToString()))
             .ForMember(dest => dest.PortfolioId, opt => opt.MapFrom(src => src.PortfolioId.Value.ToString()))

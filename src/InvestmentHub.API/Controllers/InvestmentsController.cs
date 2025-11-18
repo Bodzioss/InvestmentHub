@@ -102,7 +102,12 @@ public class InvestmentsController : ControllerBase
 
             if (result.IsSuccess && result.Investments != null)
             {
-                var response = result.Investments.Select(inv => _mapper.Map<InvestmentResponseDto>(inv)).ToList();
+                var response = result.Investments.Select(inv =>
+                {
+                    var dto = _mapper.Map<InvestmentResponseDto>(inv);
+                    dto.PortfolioId = portfolioId; // Set portfolioId from route parameter
+                    return dto;
+                }).ToList();
                 return Ok(response);
             }
 

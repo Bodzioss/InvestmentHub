@@ -47,6 +47,9 @@ secrets.json
 appsettings.Development.json
 appsettings.Local.json
 
+## Project planning & roadmap (personal notes)
+roadmap.md
+
 ## Entity Framework migrations (if not shared)
 migrations/
 

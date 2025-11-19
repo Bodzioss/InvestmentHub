@@ -1,0 +1,164 @@
+using InvestmentHub.Domain.Commands;
+using InvestmentHub.Domain.Aggregates;
+using InvestmentHub.Domain.ValueObjects;
+using MediatR;
+using Marten;
+using Microsoft.Extensions.Logging;
+
+namespace InvestmentHub.Domain.Handlers.Commands;
+
+/// <summary>
+/// Handler for SellInvestmentCommand.
+/// Responsible for selling an investment (fully or partially) using Event Sourcing.
+/// </summary>
+public class SellInvestmentCommandHandler : IRequestHandler<SellInvestmentCommand, SellInvestmentResult>
+{
+    private readonly IDocumentSession _session;
+    private readonly ILogger<SellInvestmentCommandHandler> _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the SellInvestmentCommandHandler class.
+    /// </summary>
+    /// <param name="session">The Marten document session for event sourcing</param>
+    /// <param name="logger">The logger</param>
+    public SellInvestmentCommandHandler(
+        IDocumentSession session,
+        ILogger<SellInvestmentCommandHandler> logger)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Handles the SellInvestmentCommand using Event Sourcing.
+    /// </summary>
+    /// <param name="request">The command request</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>The result of the operation</returns>
+    public async Task<SellInvestmentResult> Handle(SellInvestmentCommand request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Selling investment {InvestmentId} at {SalePrice} {Currency}. Quantity requested: {QuantityRequested}", 
+                request.InvestmentId.Value, 
+                request.SalePrice.Amount, 
+                request.SalePrice.Currency,
+                request.QuantityToSell?.ToString() ?? "ALL");
+
+            // Check for cancellation
+            cancellationToken.ThrowIfCancellationRequested();
+            
+            // DEBUG: Log the exact quantity value
+            _logger.LogInformation("DEBUG: QuantityToSell value = {Value}, HasValue = {HasValue}", 
+                request.QuantityToSell, 
+                request.QuantityToSell.HasValue);
+
+            // Validate the request
+            if (request.SalePrice.Amount < 0)
+            {
+                _logger.LogWarning("Invalid sale price: {SalePrice}", request.SalePrice.Amount);
+                return SellInvestmentResult.Failure("Sale price cannot be negative");
+            }
+
+            if (request.QuantityToSell.HasValue && request.QuantityToSell.Value <= 0)
+            {
+                _logger.LogWarning("Invalid quantity: {Quantity}", request.QuantityToSell.Value);
+                return SellInvestmentResult.Failure("Quantity to sell must be greater than zero");
+            }
+
+            if (request.SaleDate > DateTime.UtcNow)
+            {
+                _logger.LogWarning("Invalid sale date: {SaleDate}", request.SaleDate);
+                return SellInvestmentResult.Failure("Sale date cannot be in the future");
+            }
+
+            // 1. Load events from the investment stream
+            var events = await _session.Events.FetchStreamAsync(request.InvestmentId.Value, token: cancellationToken);
+            
+            if (events == null || !events.Any())
+            {
+                _logger.LogWarning("Investment {InvestmentId} not found in event stream", request.InvestmentId.Value);
+                return SellInvestmentResult.Failure("Investment not found");
+            }
+
+            // 2. Reconstruct aggregate from events
+            var investmentAggregate = new InvestmentAggregate();
+            foreach (var evt in events)
+            {
+                ((dynamic)investmentAggregate).Apply((dynamic)evt.Data);
+            }
+            investmentAggregate.ClearUncommittedEvents();
+
+            // DEBUG: Log aggregate state before sell
+            _logger.LogInformation("DEBUG: Before sell - Aggregate Quantity = {Quantity}, Status = {Status}", 
+                investmentAggregate.Quantity, 
+                investmentAggregate.Status);
+
+            // 3. Sell the investment (generates InvestmentSoldEvent)
+            investmentAggregate.Sell(request.SalePrice, request.QuantityToSell, request.SaleDate);
+            
+            // DEBUG: Log aggregate state after sell
+            _logger.LogInformation("DEBUG: After sell - Aggregate Quantity = {Quantity}, Status = {Status}", 
+                investmentAggregate.Quantity, 
+                investmentAggregate.Status);
+
+            // 4. Get the generated event to extract sale details
+            var soldEvent = investmentAggregate.GetUncommittedEvents()
+                .OfType<Events.InvestmentSoldEvent>()
+                .FirstOrDefault();
+
+            if (soldEvent == null)
+            {
+                _logger.LogError("InvestmentSoldEvent was not generated by aggregate");
+                return SellInvestmentResult.Failure("Failed to generate sale event");
+            }
+
+            // 5. Append new events to the stream
+            _session.Events.Append(
+                request.InvestmentId.Value,
+                investmentAggregate.GetUncommittedEvents().ToArray());
+
+            // 6. Save changes to Marten (persist events + update projections)
+            await _session.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Successfully sold investment {InvestmentId}. Quantity: {QuantitySold}, P/L: {ProfitLoss} {Currency}, Complete sale: {IsComplete}", 
+                request.InvestmentId.Value, 
+                soldEvent.QuantitySold,
+                soldEvent.RealizedProfitLoss.Amount,
+                soldEvent.RealizedProfitLoss.Currency,
+                soldEvent.IsCompleteSale);
+
+            // 7. Return success with sale details
+            return SellInvestmentResult.Success(
+                soldEvent.RealizedProfitLoss, 
+                soldEvent.QuantitySold, 
+                soldEvent.IsCompleteSale);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Sell investment cancelled for {InvestmentId}", request.InvestmentId.Value);
+            // Re-throw cancellation exceptions
+            throw;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Cannot sell investment {InvestmentId}: {Message}", 
+                request.InvestmentId.Value, ex.Message);
+            return SellInvestmentResult.Failure(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid arguments for selling investment {InvestmentId}: {Message}", 
+                request.InvestmentId.Value, ex.Message);
+            return SellInvestmentResult.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to sell investment {InvestmentId}: {Message}", 
+                request.InvestmentId.Value, ex.Message);
+            return SellInvestmentResult.Failure($"Failed to sell investment: {ex.Message}");
+        }
+    }
+}
+

@@ -9,7 +9,10 @@ public enum InvestmentStatus
     /// <summary>Investment is active and can be traded</summary>
     Active,
     
-    /// <summary>Investment has been sold</summary>
+    /// <summary>Investment has been partially sold (some units remaining)</summary>
+    PartiallySold,
+    
+    /// <summary>Investment has been completely sold (no units remaining)</summary>
     Sold,
     
     /// <summary>Investment is temporarily suspended from trading</summary>

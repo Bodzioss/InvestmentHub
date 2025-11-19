@@ -112,19 +112,17 @@ public class InvestmentAddedEventHandlerTests
         var symbol = Symbol.Stock("AAPL", "NASDAQ");
         var quantity = 10m;
         var purchasePrice = new Money(150m, Currency.USD);
-        var totalCost = purchasePrice.Multiply(quantity);
+        var initialCurrentValue = new Money(purchasePrice.Amount * quantity, Currency.USD);
         var purchaseDate = DateTime.UtcNow.AddDays(-30);
-        var ownerId = UserId.New();
         
         return new InvestmentAddedEvent(
             portfolioId,
             investmentId,
             symbol,
-            quantity,
             purchasePrice,
-            totalCost,
+            quantity,
             purchaseDate,
-            ownerId);
+            initialCurrentValue);
     }
 }
 

@@ -1,35 +1,36 @@
 using InvestmentHub.Domain.Commands;
+using InvestmentHub.Domain.Aggregates;
 using InvestmentHub.Domain.ValueObjects;
-using InvestmentHub.Domain.Repositories;
 using MediatR;
+using Marten;
 using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Domain.Handlers.Commands;
 
 /// <summary>
 /// Handler for UpdateInvestmentValueCommand.
-/// Responsible for updating an investment's current market value.
+/// Responsible for updating an investment's current market value using Event Sourcing.
 /// </summary>
 public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestmentValueCommand, UpdateInvestmentValueResult>
 {
-    private readonly IInvestmentRepository _investmentRepository;
+    private readonly IDocumentSession _session;
     private readonly ILogger<UpdateInvestmentValueCommandHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of the UpdateInvestmentValueCommandHandler class.
     /// </summary>
-    /// <param name="investmentRepository">The investment repository</param>
+    /// <param name="session">The Marten document session for event sourcing</param>
     /// <param name="logger">The logger</param>
     public UpdateInvestmentValueCommandHandler(
-        IInvestmentRepository investmentRepository,
+        IDocumentSession session,
         ILogger<UpdateInvestmentValueCommandHandler> logger)
     {
-        _investmentRepository = investmentRepository;
-        _logger = logger;
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Handles the UpdateInvestmentValueCommand.
+    /// Handles the UpdateInvestmentValueCommand using Event Sourcing.
     /// </summary>
     /// <param name="request">The command request</param>
     /// <param name="cancellationToken">The cancellation token</param>
@@ -38,28 +39,52 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
     {
         try
         {
-            _logger.LogInformation("Updating investment value for {InvestmentId}", request.InvestmentId.Value);
+            _logger.LogInformation("Updating investment value for {InvestmentId} to {NewPrice} {Currency}", 
+                request.InvestmentId.Value, request.CurrentPrice.Amount, request.CurrentPrice.Currency);
 
-            // 1. Load the investment from repository
-            var investment = await _investmentRepository.GetByIdAsync(request.InvestmentId, cancellationToken);
+            // Check for cancellation
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // 1. Load events from the investment stream
+            var events = await _session.Events.FetchStreamAsync(request.InvestmentId.Value, token: cancellationToken);
             
-            if (investment == null)
+            if (events == null || !events.Any())
             {
-                _logger.LogWarning("Investment {InvestmentId} not found", request.InvestmentId.Value);
+                _logger.LogWarning("Investment {InvestmentId} not found in event stream", request.InvestmentId.Value);
                 return UpdateInvestmentValueResult.Failure("Investment not found");
             }
 
-            // 2. Update the current value
-            investment.UpdateCurrentValue(request.CurrentPrice);
+            // 2. Reconstruct aggregate from events
+            var investmentAggregate = new InvestmentAggregate();
+            foreach (var evt in events)
+            {
+                ((dynamic)investmentAggregate).Apply((dynamic)evt.Data);
+            }
+            investmentAggregate.ClearUncommittedEvents();
 
-            // 3. Save changes
-            await _investmentRepository.UpdateAsync(investment, cancellationToken);
+            // 3. Update the current value (generates InvestmentValueUpdatedEvent)
+            // CurrentPrice is per unit, so we pass it directly
+            investmentAggregate.UpdateValue(request.CurrentPrice);
 
-            _logger.LogInformation("Successfully updated investment {InvestmentId} to {CurrentValue}", 
-                request.InvestmentId.Value, investment.CurrentValue);
+            // 4. Append new events to the stream
+            _session.Events.Append(
+                request.InvestmentId.Value,
+                investmentAggregate.GetUncommittedEvents().ToArray());
 
-            // 4. Return success with the new total value
-            return UpdateInvestmentValueResult.Success(investment.CurrentValue);
+            // 5. Save changes to Marten (persist events + update projections)
+            await _session.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Successfully updated investment {InvestmentId}. New total value: {CurrentValue} {Currency}", 
+                request.InvestmentId.Value, investmentAggregate.CurrentValue.Amount, investmentAggregate.CurrentValue.Currency);
+
+            // 6. Return success with the new total value
+            return UpdateInvestmentValueResult.Success(investmentAggregate.CurrentValue);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Update investment value cancelled for {InvestmentId}", request.InvestmentId.Value);
+            // Re-throw cancellation exceptions
+            throw;
         }
         catch (InvalidOperationException ex)
         {
@@ -69,8 +94,8 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update investment value for {InvestmentId}", 
-                request.InvestmentId.Value);
+            _logger.LogError(ex, "Failed to update investment value for {InvestmentId}: {Message}", 
+                request.InvestmentId.Value, ex.Message);
             return UpdateInvestmentValueResult.Failure($"Failed to update investment value: {ex.Message}");
         }
     }

@@ -1,39 +1,38 @@
 using InvestmentHub.Domain.Commands;
-using InvestmentHub.Domain.Entities;
+using InvestmentHub.Domain.Aggregates;
+using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.ValueObjects;
-using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Domain.ReadModels;
 using MediatR;
+using Marten;
+using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Domain.Handlers.Commands;
 
 /// <summary>
 /// Handler for AddInvestmentCommand.
-/// Responsible for adding a new investment to a portfolio with full business logic validation.
+/// Responsible for adding a new investment to a portfolio using Event Sourcing with Marten.
 /// </summary>
 public class AddInvestmentCommandHandler : IRequestHandler<AddInvestmentCommand, AddInvestmentResult>
 {
-    private readonly IPortfolioRepository _portfolioRepository;
-    private readonly IInvestmentRepository _investmentRepository;
-    private readonly IUserRepository _userRepository;
+    private readonly IDocumentSession _session;
+    private readonly ILogger<AddInvestmentCommandHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of the AddInvestmentCommandHandler class.
     /// </summary>
-    /// <param name="portfolioRepository">The portfolio repository</param>
-    /// <param name="investmentRepository">The investment repository</param>
-    /// <param name="userRepository">The user repository</param>
+    /// <param name="session">The Marten document session for event sourcing</param>
+    /// <param name="logger">The logger</param>
     public AddInvestmentCommandHandler(
-        IPortfolioRepository portfolioRepository,
-        IInvestmentRepository investmentRepository,
-        IUserRepository userRepository)
+        IDocumentSession session,
+        ILogger<AddInvestmentCommandHandler> logger)
     {
-        _portfolioRepository = portfolioRepository ?? throw new ArgumentNullException(nameof(portfolioRepository));
-        _investmentRepository = investmentRepository ?? throw new ArgumentNullException(nameof(investmentRepository));
-        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Handles the AddInvestmentCommand.
+    /// Handles the AddInvestmentCommand using Event Sourcing.
     /// </summary>
     /// <param name="request">The command request</param>
     /// <param name="cancellationToken">The cancellation token</param>
@@ -42,55 +41,73 @@ public class AddInvestmentCommandHandler : IRequestHandler<AddInvestmentCommand,
     {
         try
         {
+            _logger.LogInformation("Adding investment to portfolio {PortfolioId}", 
+                request.PortfolioId.Value);
+
             // Check for cancellation
-            if (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException("Cancellation was requested");
-            }
+            cancellationToken.ThrowIfCancellationRequested();
             
             // Validate the request
             if (request.Quantity <= 0)
             {
+                _logger.LogWarning("Invalid quantity: {Quantity}", request.Quantity);
                 return AddInvestmentResult.Failure("Quantity must be positive");
             }
 
             if (request.PurchaseDate > DateTime.UtcNow)
             {
+                _logger.LogWarning("Invalid purchase date: {PurchaseDate}", request.PurchaseDate);
                 return AddInvestmentResult.Failure("Purchase date cannot be in the future");
             }
 
-            // 1. Load and validate portfolio exists
-            var portfolio = await _portfolioRepository.GetByIdAsync(request.PortfolioId, cancellationToken);
+            // 1. Load portfolio read model to validate it exists and is not closed
+            var portfolio = await _session.Query<PortfolioReadModel>()
+                .FirstOrDefaultAsync(p => p.Id == request.PortfolioId.Value, cancellationToken);
+            
             if (portfolio == null)
             {
+                _logger.LogWarning("Portfolio {PortfolioId} not found", request.PortfolioId.Value);
                 return AddInvestmentResult.Failure("Portfolio not found");
             }
 
-            // 2. Validate user exists and has access to portfolio
-            var user = await _userRepository.GetByIdAsync(portfolio.OwnerId, cancellationToken);
-            if (user == null)
+            if (portfolio.IsClosed)
             {
-                return AddInvestmentResult.Failure("User not found");
+                _logger.LogWarning("Portfolio {PortfolioId} is closed", request.PortfolioId.Value);
+                return AddInvestmentResult.Failure("Cannot add investment to a closed portfolio");
             }
 
-            // 3. Check for duplicate symbol in portfolio
-            var existingInvestment = await _investmentRepository.ExistsBySymbolAsync(request.PortfolioId, request.Symbol, cancellationToken);
+            // 2. Check for duplicate symbol in portfolio (query InvestmentReadModel)
+            var existingInvestment = await _session.Query<InvestmentReadModel>()
+                .Where(i => i.PortfolioId == request.PortfolioId.Value 
+                    && i.Ticker == request.Symbol.Ticker 
+                    && i.Status == InvestmentStatus.Active)
+                .AnyAsync(cancellationToken);
+
             if (existingInvestment)
             {
+                _logger.LogWarning("Investment with symbol {Symbol} already exists in portfolio {PortfolioId}", 
+                    request.Symbol.Ticker, request.PortfolioId.Value);
                 return AddInvestmentResult.Failure($"Investment with symbol {request.Symbol.Ticker} already exists in this portfolio");
             }
 
-            // 4. Check portfolio investment limits
-            var investmentCount = await _investmentRepository.GetCountByPortfolioIdAsync(request.PortfolioId, cancellationToken);
+            // 3. Check portfolio investment limits
+            var investmentCount = await _session.Query<InvestmentReadModel>()
+                .Where(i => i.PortfolioId == request.PortfolioId.Value)
+                .CountAsync(cancellationToken);
+
             const int maxInvestmentsPerPortfolio = 100;
             if (investmentCount >= maxInvestmentsPerPortfolio)
             {
+                _logger.LogWarning("Portfolio {PortfolioId} has reached maximum investment limit: {Count}", 
+                    request.PortfolioId.Value, investmentCount);
                 return AddInvestmentResult.Failure($"Portfolio cannot have more than {maxInvestmentsPerPortfolio} investments");
             }
 
-            // 5. Create the investment
+            // 4. Generate new investment ID
             var investmentId = InvestmentId.New();
-            var investment = new Investment(
+
+            // 5. Create investment aggregate (generates InvestmentAddedEvent)
+            var investmentAggregate = InvestmentAggregate.Create(
                 investmentId,
                 request.PortfolioId,
                 request.Symbol,
@@ -98,23 +115,31 @@ public class AddInvestmentCommandHandler : IRequestHandler<AddInvestmentCommand,
                 request.Quantity,
                 request.PurchaseDate);
 
-            // 6. Add investment to portfolio (this will trigger domain events)
-            portfolio.AddInvestment(investment);
+            // 6. Start event stream for this investment and save events
+            // Marten will automatically apply the InvestmentProjection to create InvestmentReadModel
+            _session.Events.StartStream<InvestmentAggregate>(
+                investmentId.Value,
+                investmentAggregate.GetUncommittedEvents().ToArray());
 
-            // 7. Save changes
-            await _investmentRepository.AddAsync(investment, cancellationToken);
-            await _portfolioRepository.UpdateAsync(portfolio, cancellationToken);
+            // 7. Save changes to Marten (persist events + update projections)
+            await _session.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Successfully added investment {InvestmentId} to portfolio {PortfolioId} with {EventCount} events", 
+                investmentId.Value, request.PortfolioId.Value, investmentAggregate.GetUncommittedEvents().Count());
 
             // 8. Return success
             return AddInvestmentResult.Success(investmentId);
         }
         catch (OperationCanceledException)
         {
+            _logger.LogInformation("Add investment cancelled for portfolio {PortfolioId}", request.PortfolioId.Value);
             // Re-throw cancellation exceptions
             throw;
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to add investment to portfolio {PortfolioId}: {Message}", 
+                request.PortfolioId.Value, ex.Message);
             return AddInvestmentResult.Failure($"Failed to add investment: {ex.Message}");
         }
     }

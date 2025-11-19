@@ -88,6 +88,39 @@ public class InvestmentsController : ControllerBase
     }
 
     /// <summary>
+    /// Sells an investment (fully or partially).
+    /// </summary>
+    /// <param name="request">The sell investment request</param>
+    /// <returns>The result of the operation</returns>
+    [HttpPost("sell")]
+    public async Task<IActionResult> SellInvestment([FromBody] SellInvestmentRequest request)
+    {
+        try
+        {
+            var command = _mapper.Map<SellInvestmentCommand>(request);
+            var result = await _mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                return Ok(new
+                {
+                    RealizedProfitLoss = result.RealizedProfitLoss!.Amount,
+                    Currency = result.RealizedProfitLoss!.Currency.ToString(),
+                    QuantitySold = result.QuantitySold,
+                    IsCompleteSale = result.IsCompleteSale
+                });
+            }
+
+            return BadRequest(new { Error = result.ErrorMessage });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error selling investment");
+            return StatusCode(500, new { Error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
     /// Gets all investments for a portfolio.
     /// </summary>
     /// <param name="portfolioId">The portfolio ID</param>
@@ -153,74 +186,33 @@ public class InvestmentsController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Deletes an investment.
-    /// </summary>
-    /// <param name="investmentId">The investment ID</param>
-    /// <returns>The result of the operation</returns>
+    // ==================== Event Sourcing Incompatible Endpoints ====================
+    // The following endpoints are DISABLED because they are incompatible with Event Sourcing principles:
+    // 
+    // 1. DELETE /api/Investments/{id} - In Event Sourcing, we don't delete data; events are immutable.
+    //    Alternative: Use POST /api/Investments/sell to mark investment as sold.
+    //    Future: Can add ArchiveInvestment command if needed (soft delete via event).
+    //
+    // 2. PUT /api/Investments/{id} - In Event Sourcing, we don't modify historical data.
+    //    Alternative: Use PUT /api/Investments/value to update current market value only.
+    //    Future: Can add CorrectInvestment command for error corrections (with audit trail).
+    //
+    // If you need these features, please discuss with the team about proper Event Sourcing patterns.
+    // ================================================================================
+
+    /* DISABLED - Event Sourcing Incompatible
     [HttpDelete("{investmentId}")]
     public async Task<IActionResult> DeleteInvestment([FromRoute] string investmentId)
     {
-        try
-        {
-            var command = new DeleteInvestmentCommand(InvestmentId.FromString(investmentId));
-            var result = await _mediator.Send(command);
-
-            if (result.IsSuccess)
-            {
-                return Ok(new { Message = "Investment deleted successfully" });
-            }
-
-            return BadRequest(new { Error = result.ErrorMessage });
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogError(ex, "Invalid investment ID format: {InvestmentId}", investmentId);
-            return BadRequest(new { Error = "Invalid investment ID format" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting investment");
-            return StatusCode(500, new { Error = "Internal server error" });
-        }
+        return StatusCode(501, new { Error = "Delete is not supported in Event Sourcing. Use 'Sell Investment' instead." });
     }
+    */
 
-    /// <summary>
-    /// Updates an investment (quantity, purchase price, etc.).
-    /// </summary>
-    /// <param name="investmentId">The investment ID</param>
-    /// <param name="request">The update investment request</param>
-    /// <returns>The result of the operation</returns>
+    /* DISABLED - Event Sourcing Incompatible
     [HttpPut("{investmentId}")]
     public async Task<IActionResult> UpdateInvestment([FromRoute] string investmentId, [FromBody] UpdateInvestmentRequest request)
     {
-        try
-        {
-            var command = new UpdateInvestmentCommand(
-                InvestmentId.FromString(investmentId),
-                request.PurchasePrice != null
-                    ? new Money(request.PurchasePrice.Amount, Enum.Parse<Currency>(request.PurchasePrice.Currency))
-                    : null,
-                request.Quantity);
-
-            var result = await _mediator.Send(command);
-
-            if (result.IsSuccess)
-            {
-                return Ok(new { Message = "Investment updated successfully" });
-            }
-
-            return BadRequest(new { Error = result.ErrorMessage });
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogError(ex, "Invalid investment ID format: {InvestmentId}", investmentId);
-            return BadRequest(new { Error = "Invalid investment ID format" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating investment");
-            return StatusCode(500, new { Error = "Internal server error" });
-        }
+        return StatusCode(501, new { Error = "Direct updates are not supported in Event Sourcing. Use 'Update Investment Value' instead." });
     }
+    */
 }

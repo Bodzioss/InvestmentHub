@@ -1,36 +1,37 @@
-using InvestmentHub.Domain.Entities;
 using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.Queries;
+using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Domain.ValueObjects;
-using InvestmentHub.Domain.Repositories;
 using MediatR;
+using Marten;
+using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Domain.Handlers.Queries;
 
 /// <summary>
 /// Handler for GetInvestmentsQuery.
-/// Responsible for retrieving investments for a portfolio with full business logic.
+/// Responsible for retrieving investments from the read model with filtering and pagination.
 /// </summary>
 public class GetInvestmentsQueryHandler : IRequestHandler<GetInvestmentsQuery, GetInvestmentsResult>
 {
-    private readonly IInvestmentRepository _investmentRepository;
-    private readonly IPortfolioRepository _portfolioRepository;
+    private readonly IDocumentSession _session;
+    private readonly ILogger<GetInvestmentsQueryHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of the GetInvestmentsQueryHandler class.
     /// </summary>
-    /// <param name="investmentRepository">The investment repository</param>
-    /// <param name="portfolioRepository">The portfolio repository</param>
+    /// <param name="session">The Marten document session</param>
+    /// <param name="logger">The logger</param>
     public GetInvestmentsQueryHandler(
-        IInvestmentRepository investmentRepository,
-        IPortfolioRepository portfolioRepository)
+        IDocumentSession session,
+        ILogger<GetInvestmentsQueryHandler> logger)
     {
-        _investmentRepository = investmentRepository ?? throw new ArgumentNullException(nameof(investmentRepository));
-        _portfolioRepository = portfolioRepository ?? throw new ArgumentNullException(nameof(portfolioRepository));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Handles the GetInvestmentsQuery.
+    /// Handles the GetInvestmentsQuery by reading from InvestmentReadModel.
     /// </summary>
     /// <param name="request">The query request</param>
     /// <param name="cancellationToken">The cancellation token</param>
@@ -39,75 +40,105 @@ public class GetInvestmentsQueryHandler : IRequestHandler<GetInvestmentsQuery, G
     {
         try
         {
-            // Check for cancellation
-            if (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException("Cancellation was requested");
-            }
+            _logger.LogInformation("Querying investments for portfolio {PortfolioId}", request.PortfolioId.Value);
 
-            // 1. Validate portfolio exists
-            var portfolio = await _portfolioRepository.GetByIdAsync(request.PortfolioId, cancellationToken);
+            // Check for cancellation
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // 1. Validate portfolio exists (check PortfolioReadModel)
+            var portfolio = await _session.Query<PortfolioReadModel>()
+                .FirstOrDefaultAsync(p => p.Id == request.PortfolioId.Value, cancellationToken);
+            
             if (portfolio == null)
             {
+                _logger.LogWarning("Portfolio {PortfolioId} not found", request.PortfolioId.Value);
                 return GetInvestmentsResult.Failure("Portfolio not found");
             }
 
-            // 2. Load investments for the portfolio
-            var investments = await _investmentRepository.GetByPortfolioIdAsync(request.PortfolioId, cancellationToken);
+            // 2. Build query for InvestmentReadModel
+            var query = _session.Query<InvestmentReadModel>()
+                .Where(i => i.PortfolioId == request.PortfolioId.Value);
 
             // 3. Apply filters
-            var filteredInvestments = investments.AsQueryable();
-
             if (request.AssetTypeFilter.HasValue)
             {
-                filteredInvestments = filteredInvestments.Where(i => i.Symbol.AssetType == request.AssetTypeFilter.Value);
+                var assetTypeString = request.AssetTypeFilter.Value.ToString();
+                query = query.Where(i => i.AssetType == assetTypeString);
             }
 
             if (request.StatusFilter.HasValue)
             {
-                filteredInvestments = filteredInvestments.Where(i => i.Status == request.StatusFilter.Value);
+                query = query.Where(i => i.Status == request.StatusFilter.Value);
             }
 
             if (!request.IncludeInactive)
             {
-                filteredInvestments = filteredInvestments.Where(i => i.Status == InvestmentStatus.Active);
+                query = query.Where(i => i.Status == InvestmentStatus.Active);
             }
 
             // 4. Get total count before pagination
-            var totalCount = filteredInvestments.Count();
+            var totalCount = await query.CountAsync(cancellationToken);
 
-            // 5. Apply pagination
-            var paginatedInvestments = filteredInvestments
+            // 5. Apply pagination and execute query
+            var readModels = await query
+                .OrderByDescending(i => i.LastUpdated)
                 .Skip(request.Offset)
                 .Take(request.Limit)
-                .ToList();
+                .ToListAsync(cancellationToken);
 
             // 6. Convert to summary DTOs
-            var investmentSummaries = paginatedInvestments.Select(i => new InvestmentSummary(
-                i.Id,
-                i.Symbol,
-                i.PurchasePrice,
-                i.CurrentValue.Divide(i.Quantity), // Calculate current price per unit
-                i.Quantity,
-                i.PurchaseDate,
-                i.Status,
-                i.LastUpdated,
-                i.GetTotalCost(),
-                i.CurrentValue,
-                i.GetUnrealizedGainLoss(),
-                i.GetPercentageGainLoss())).ToList();
+            var investmentSummaries = readModels.Select(rm => ConvertToInvestmentSummary(rm)).ToList();
+
+            _logger.LogInformation("Successfully retrieved {Count} investments for portfolio {PortfolioId}", 
+                investmentSummaries.Count, request.PortfolioId.Value);
 
             // 7. Return success
             return GetInvestmentsResult.Success(investmentSummaries, totalCount);
         }
         catch (OperationCanceledException)
         {
-            // Re-throw cancellation exceptions
+            _logger.LogInformation("Get investments query cancelled for portfolio {PortfolioId}", request.PortfolioId.Value);
             throw;
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to retrieve investments for portfolio {PortfolioId}: {Message}", 
+                request.PortfolioId.Value, ex.Message);
             return GetInvestmentsResult.Failure($"Failed to retrieve investments: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Converts InvestmentReadModel to InvestmentSummary.
+    /// </summary>
+    private static InvestmentSummary ConvertToInvestmentSummary(InvestmentReadModel readModel)
+    {
+        var investmentId = new InvestmentId(readModel.Id);
+        var symbol = new Symbol(
+            readModel.Ticker,
+            readModel.Exchange,
+            Enum.Parse<AssetType>(readModel.AssetType));
+        var currency = Enum.Parse<Currency>(readModel.Currency);
+        var purchasePrice = new Money(readModel.PurchasePrice, currency);
+        var currentValue = new Money(readModel.CurrentValue, currency);
+        var totalCost = new Money(readModel.TotalCost, currency);
+        var unrealizedGainLoss = new Money(readModel.UnrealizedProfitLoss, currency);
+        var currentPrice = readModel.Quantity > 0 
+            ? new Money(readModel.ValuePerUnit, currency)
+            : new Money(0, currency);
+
+        return new InvestmentSummary(
+            investmentId,
+            symbol,
+            purchasePrice,
+            currentPrice,
+            readModel.Quantity,
+            readModel.PurchaseDate,
+            readModel.Status,
+            readModel.LastUpdated,
+            totalCost,
+            currentValue,
+            unrealizedGainLoss,
+            readModel.ROIPercentage);
     }
 }

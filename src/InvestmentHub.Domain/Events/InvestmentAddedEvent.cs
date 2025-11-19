@@ -1,118 +1,98 @@
 using InvestmentHub.Domain.Common;
-using InvestmentHub.Domain.Entities;
 using InvestmentHub.Domain.ValueObjects;
 
 namespace InvestmentHub.Domain.Events;
 
 /// <summary>
 /// Domain event raised when a new investment is added to a portfolio.
-/// This event enables decoupled handling of investment additions across the system.
+/// This event captures all initial investment details at the moment of purchase.
 /// </summary>
 public class InvestmentAddedEvent : DomainEvent
 {
     /// <summary>
-    /// Gets the unique identifier of the portfolio where the investment was added.
+    /// Gets the unique identifier of the portfolio containing this investment.
     /// </summary>
     public PortfolioId PortfolioId { get; }
-    
+
     /// <summary>
-    /// Gets the unique identifier of the added investment.
+    /// Gets the unique identifier of the investment.
     /// </summary>
     public InvestmentId InvestmentId { get; }
-    
+
     /// <summary>
-    /// Gets the symbol of the added investment.
+    /// Gets the symbol (ticker) of the investment.
     /// </summary>
     public Symbol Symbol { get; }
-    
+
     /// <summary>
-    /// Gets the quantity of the added investment.
-    /// </summary>
-    public decimal Quantity { get; }
-    
-    /// <summary>
-    /// Gets the purchase price per unit of the investment.
+    /// Gets the purchase price per unit.
     /// </summary>
     public Money PurchasePrice { get; }
-    
+
     /// <summary>
-    /// Gets the total cost of the investment (purchase price × quantity).
+    /// Gets the quantity of units purchased.
     /// </summary>
-    public Money TotalCost { get; }
-    
+    public decimal Quantity { get; }
+
     /// <summary>
     /// Gets the date when the investment was purchased.
     /// </summary>
     public DateTime PurchaseDate { get; }
-    
+
     /// <summary>
-    /// Gets the unique identifier of the portfolio owner.
+    /// Gets the initial current value (typically same as purchase price at creation).
     /// </summary>
-    public UserId OwnerId { get; }
-    
+    public Money InitialCurrentValue { get; }
+
     /// <summary>
     /// Initializes a new instance of the InvestmentAddedEvent class.
     /// </summary>
-    /// <param name="portfolioId">The ID of the portfolio</param>
-    /// <param name="investmentId">The ID of the investment</param>
+    /// <param name="portfolioId">The portfolio identifier</param>
+    /// <param name="investmentId">The investment identifier</param>
     /// <param name="symbol">The investment symbol</param>
+    /// <param name="purchasePrice">The purchase price per unit</param>
     /// <param name="quantity">The quantity purchased</param>
-    /// <param name="purchasePrice">The price per unit</param>
-    /// <param name="totalCost">The total cost of the investment</param>
     /// <param name="purchaseDate">The purchase date</param>
-    /// <param name="ownerId">The ID of the portfolio owner</param>
-    /// <exception cref="ArgumentNullException">Thrown when any required parameter is null</exception>
+    /// <param name="initialCurrentValue">The initial current value</param>
+    /// <exception cref="ArgumentNullException">Thrown when required parameters are null</exception>
+    /// <exception cref="ArgumentException">Thrown when quantity or prices are invalid</exception>
     public InvestmentAddedEvent(
         PortfolioId portfolioId,
         InvestmentId investmentId,
         Symbol symbol,
-        decimal quantity,
         Money purchasePrice,
-        Money totalCost,
+        decimal quantity,
         DateTime purchaseDate,
-        UserId ownerId) : base(1)
+        Money initialCurrentValue) : base(version: 1)
     {
         PortfolioId = portfolioId ?? throw new ArgumentNullException(nameof(portfolioId));
         InvestmentId = investmentId ?? throw new ArgumentNullException(nameof(investmentId));
         Symbol = symbol ?? throw new ArgumentNullException(nameof(symbol));
-        Quantity = quantity;
         PurchasePrice = purchasePrice ?? throw new ArgumentNullException(nameof(purchasePrice));
-        TotalCost = totalCost ?? throw new ArgumentNullException(nameof(totalCost));
+        InitialCurrentValue = initialCurrentValue ?? throw new ArgumentNullException(nameof(initialCurrentValue));
+
+        if (quantity <= 0)
+        {
+            throw new ArgumentException("Quantity must be greater than zero", nameof(quantity));
+        }
+
+        if (purchasePrice.Amount <= 0)
+        {
+            throw new ArgumentException("Purchase price must be greater than zero", nameof(purchasePrice));
+        }
+
+        if (purchaseDate > DateTime.UtcNow)
+        {
+            throw new ArgumentException("Purchase date cannot be in the future", nameof(purchaseDate));
+        }
+
+        Quantity = quantity;
         PurchaseDate = purchaseDate;
-        OwnerId = ownerId ?? throw new ArgumentNullException(nameof(ownerId));
     }
-    
+
     /// <summary>
-    /// Creates an InvestmentAddedEvent from an Investment and Portfolio.
+    /// Returns a string representation of the event.
     /// </summary>
-    /// <param name="investment">The investment that was added</param>
-    /// <param name="portfolioId">The ID of the portfolio</param>
-    /// <param name="ownerId">The ID of the portfolio owner</param>
-    /// <returns>A new InvestmentAddedEvent instance</returns>
-    /// <exception cref="ArgumentNullException">Thrown when any parameter is null</exception>
-    public static InvestmentAddedEvent FromInvestment(
-        Investment investment,
-        PortfolioId portfolioId,
-        UserId ownerId)
-    {
-        if (investment == null)
-            throw new ArgumentNullException(nameof(investment));
-        
-        return new InvestmentAddedEvent(
-            portfolioId,
-            investment.Id,
-            investment.Symbol,
-            investment.Quantity,
-            investment.PurchasePrice,
-            investment.GetTotalCost(),
-            investment.PurchaseDate,
-            ownerId);
-    }
-    
-    /// <summary>
-    /// Returns a string representation of the InvestmentAddedEvent.
-    /// </summary>
-    /// <returns>Formatted string with event details</returns>
-    public override string ToString() => 
-        $"InvestmentAdded: {Symbol.Ticker} ({Quantity} units @ {PurchasePrice}) to Portfolio {PortfolioId.Value}";
+    public override string ToString() =>
+        $"InvestmentAdded: {Symbol.Ticker} x{Quantity} @ {PurchasePrice.Amount} {PurchasePrice.Currency} to Portfolio {PortfolioId.Value}";
 }

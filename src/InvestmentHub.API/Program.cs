@@ -37,6 +37,7 @@ builder.Services.AddMarten(options =>
     
     // Register projections
     options.Projections.Add<PortfolioProjection>(Marten.Events.Projections.ProjectionLifecycle.Inline);
+    options.Projections.Add<InvestmentProjection>(Marten.Events.Projections.ProjectionLifecycle.Inline);
     
     // Configure database schema (optional - Marten will auto-create if needed)
     if (builder.Environment.IsDevelopment())

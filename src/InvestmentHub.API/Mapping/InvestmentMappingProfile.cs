@@ -43,6 +43,16 @@ public class InvestmentMappingProfile : Profile
                     Enum.Parse<Currency>(src.CurrentPrice.Currency))))
             .ForAllMembers(opt => opt.Ignore());
 
+        CreateMap<SellInvestmentRequest, SellInvestmentCommand>()
+            .ConstructUsing(src => new SellInvestmentCommand(
+                InvestmentId.FromString(src.InvestmentId),
+                new Money(
+                    src.SalePrice.Amount,
+                    Enum.Parse<Currency>(src.SalePrice.Currency)),
+                src.QuantityToSell,
+                src.SaleDate))
+            .ForAllMembers(opt => opt.Ignore());
+
         CreateMap<CreatePortfolioRequest, CreatePortfolioCommand>()
             .ConstructUsing(src => new CreatePortfolioCommand(
                 PortfolioId.New(),

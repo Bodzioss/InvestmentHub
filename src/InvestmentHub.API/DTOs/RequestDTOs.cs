@@ -49,6 +49,24 @@ public record UpdateInvestmentValueRequest
 }
 
 /// <summary>
+/// Request DTO for selling an investment.
+/// </summary>
+public record SellInvestmentRequest
+{
+    /// <summary>Gets the investment ID</summary>
+    public required string InvestmentId { get; init; }
+
+    /// <summary>Gets the sale price per unit</summary>
+    public required MoneyRequest SalePrice { get; init; }
+
+    /// <summary>Gets the quantity to sell (null = sell all remaining units)</summary>
+    public decimal? QuantityToSell { get; init; }
+
+    /// <summary>Gets the sale date</summary>
+    public required DateTime SaleDate { get; init; }
+}
+
+/// <summary>
 /// Request DTO for creating a portfolio.
 /// </summary>
 public record CreatePortfolioRequest

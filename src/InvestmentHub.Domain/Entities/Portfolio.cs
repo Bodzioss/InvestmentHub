@@ -133,7 +133,14 @@ public class Portfolio
         LastUpdated = DateTime.UtcNow;
         
         // Raise domain event
-        var investmentAddedEvent = InvestmentAddedEvent.FromInvestment(investment, Id, OwnerId);
+        var investmentAddedEvent = new InvestmentAddedEvent(
+            portfolioId: Id,
+            investmentId: investment.Id,
+            symbol: investment.Symbol,
+            purchasePrice: investment.PurchasePrice,
+            quantity: investment.Quantity,
+            purchaseDate: investment.PurchaseDate,
+            initialCurrentValue: investment.CurrentValue);
         _domainEvents.Add(investmentAddedEvent);
     }
     

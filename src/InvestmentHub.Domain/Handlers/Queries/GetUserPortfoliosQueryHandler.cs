@@ -1,39 +1,38 @@
-using InvestmentHub.Domain.Entities;
+using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.Queries;
+using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Domain.ValueObjects;
-using InvestmentHub.Domain.Repositories;
+using Marten;
 using MediatR;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Domain.Handlers.Queries;
 
 /// <summary>
 /// Handler for GetUserPortfoliosQuery.
-/// Responsible for retrieving all portfolios for a user with full business logic.
+/// Responsible for retrieving all portfolios for a user from the read model using Marten.
 /// </summary>
 public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQuery, GetUserPortfoliosResult>
 {
-    private readonly IPortfolioRepository _portfolioRepository;
-    private readonly IUserRepository _userRepository;
+    private readonly IDocumentSession _session;
+    private readonly ILogger<GetUserPortfoliosQueryHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of the GetUserPortfoliosQueryHandler class.
     /// </summary>
-    /// <param name="portfolioRepository">The portfolio repository</param>
-    /// <param name="userRepository">The user repository</param>
+    /// <param name="session">The Marten document session</param>
+    /// <param name="logger">The logger</param>
     public GetUserPortfoliosQueryHandler(
-        IPortfolioRepository portfolioRepository,
-        IUserRepository userRepository)
+        IDocumentSession session,
+        ILogger<GetUserPortfoliosQueryHandler> logger)
     {
-        _portfolioRepository = portfolioRepository ?? throw new ArgumentNullException(nameof(portfolioRepository));
-        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Handles the GetUserPortfoliosQuery.
+    /// Handles the GetUserPortfoliosQuery by reading from PortfolioReadModel.
+    /// This is a fast read operation against the denormalized read model.
     /// </summary>
     /// <param name="request">The query request</param>
     /// <param name="cancellationToken">The cancellation token</param>
@@ -42,39 +41,48 @@ public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQu
     {
         try
         {
+            _logger.LogInformation("Querying portfolios for user {UserId} from read model", request.UserId.Value);
+
             // Check for cancellation
             cancellationToken.ThrowIfCancellationRequested();
             
-            // 1. Validate user exists
-            var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
-            if (user == null)
+            // Query portfolios for this user from read model
+            var portfolios = await _session.Query<PortfolioReadModel>()
+                .Where(p => p.OwnerId == request.UserId.Value)
+                .ToListAsync(cancellationToken);
+
+            if (!portfolios.Any())
             {
-                return GetUserPortfoliosResult.Failure("User not found");
+                _logger.LogInformation("No portfolios found for user {UserId}", request.UserId.Value);
+                return GetUserPortfoliosResult.Success(new List<PortfolioSummary>());
             }
 
-            // 2. Load portfolios for the user
-            var portfolios = await _portfolioRepository.GetByUserIdAsync(request.UserId, cancellationToken);
-
-            // 3. Convert to summary DTOs
+            // Convert to summary DTOs
             var portfolioSummaries = portfolios.Select(p => new PortfolioSummary(
-                p.Id,
+                new PortfolioId(p.Id),
                 p.Name,
                 p.Description,
-                p.GetTotalValue(),
-                p.GetTotalCost(),
-                p.GetTotalGainLoss(),
-                p.Investments.Count)).ToList();
+                new Money(p.TotalValue, Enum.Parse<Currency>(p.Currency)),
+                new Money(0, Enum.Parse<Currency>(p.Currency)), // TotalCost - TODO: calculate from investments
+                new Money(0, Enum.Parse<Currency>(p.Currency)), // UnrealizedGainLoss - TODO: calculate
+                p.InvestmentCount
+            )).ToList();
 
-            // 4. Return success
+            _logger.LogInformation("Successfully retrieved {Count} portfolios for user {UserId}", 
+                portfolioSummaries.Count, request.UserId.Value);
+
             return GetUserPortfoliosResult.Success(portfolioSummaries);
         }
         catch (OperationCanceledException)
         {
+            _logger.LogInformation("Portfolio query cancelled for user {UserId}", request.UserId.Value);
             // Re-throw cancellation exceptions
             throw;
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to retrieve portfolios for user {UserId}: {Message}", 
+                request.UserId.Value, ex.Message);
             return GetUserPortfoliosResult.Failure($"Failed to retrieve user portfolios: {ex.Message}");
         }
     }

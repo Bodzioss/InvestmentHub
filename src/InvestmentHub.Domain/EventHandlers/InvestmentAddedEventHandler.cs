@@ -60,9 +60,12 @@ public class InvestmentAddedEventHandler : IDomainEventSubscriber<InvestmentAdde
     private async Task SimulateValuationUpdateAsync(InvestmentAddedEvent domainEvent)
     {
         // Simulate async work
-        await Task.Delay(100);        
+        await Task.Delay(100);
+        
+        // Calculate total cost
+        var totalCost = domainEvent.PurchasePrice.Amount * domainEvent.Quantity;
         
         Console.WriteLine($"Portfolio valuation updated for Portfolio {domainEvent.PortfolioId.Value}");
-        Console.WriteLine($"Added investment: {domainEvent.Symbol.Ticker} worth {domainEvent.TotalCost}");
+        Console.WriteLine($"Added investment: {domainEvent.Symbol.Ticker} x{domainEvent.Quantity} worth {totalCost} {domainEvent.PurchasePrice.Currency}");
     }
 }

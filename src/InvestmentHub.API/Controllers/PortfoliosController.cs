@@ -87,9 +87,9 @@ public class PortfoliosController : ControllerBase
                     Id = p.PortfolioId.Value.ToString(),
                     Name = p.Name,
                     Description = p.Description,
-                    OwnerId = "", // Not available in PortfolioSummary
-                    CreatedDate = DateTime.MinValue, // Not available in PortfolioSummary
-                    LastUpdated = DateTime.MinValue, // Not available in PortfolioSummary
+                    OwnerId = userId, // Use the userId from route parameter
+                    CreatedDate = p.CreatedAt,
+                    LastUpdated = p.LastUpdated,
                     TotalValue = new MoneyResponseDto
                     {
                         Amount = p.TotalValue.Amount,

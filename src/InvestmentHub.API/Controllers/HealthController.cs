@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
-using InvestmentHub.Web.Data;
+using InvestmentHub.Infrastructure.Data;
 
 namespace InvestmentHub.API.Controllers;
 

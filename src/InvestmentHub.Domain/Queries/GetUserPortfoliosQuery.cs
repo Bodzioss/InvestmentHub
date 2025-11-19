@@ -102,6 +102,16 @@ public record PortfolioSummary
     public int ActiveInvestmentCount { get; init; }
 
     /// <summary>
+    /// Gets the date and time when the portfolio was created.
+    /// </summary>
+    public DateTime CreatedAt { get; init; }
+
+    /// <summary>
+    /// Gets the date and time when the portfolio was last updated.
+    /// </summary>
+    public DateTime LastUpdated { get; init; }
+
+    /// <summary>
     /// Initializes a new instance of the PortfolioSummary class.
     /// </summary>
     /// <param name="portfolioId">The portfolio ID</param>
@@ -111,6 +121,8 @@ public record PortfolioSummary
     /// <param name="totalCost">The total cost</param>
     /// <param name="unrealizedGainLoss">The unrealized gain/loss</param>
     /// <param name="activeInvestmentCount">The active investment count</param>
+    /// <param name="createdAt">The creation date and time</param>
+    /// <param name="lastUpdated">The last updated date and time</param>
     public PortfolioSummary(
         PortfolioId portfolioId,
         string name,
@@ -118,7 +130,9 @@ public record PortfolioSummary
         Money totalValue,
         Money totalCost,
         Money unrealizedGainLoss,
-        int activeInvestmentCount)
+        int activeInvestmentCount,
+        DateTime createdAt,
+        DateTime lastUpdated)
     {
         PortfolioId = portfolioId;
         Name = name;
@@ -127,5 +141,7 @@ public record PortfolioSummary
         TotalCost = totalCost;
         UnrealizedGainLoss = unrealizedGainLoss;
         ActiveInvestmentCount = activeInvestmentCount;
+        CreatedAt = createdAt;
+        LastUpdated = lastUpdated;
     }
 }

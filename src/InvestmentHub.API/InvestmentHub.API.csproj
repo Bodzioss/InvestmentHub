@@ -28,7 +28,6 @@
     <ProjectReference Include="..\InvestmentHub.Application\InvestmentHub.Application.csproj" />
     <ProjectReference Include="..\InvestmentHub.Contracts\InvestmentHub.Contracts.csproj" />
     <ProjectReference Include="..\InvestmentHub.Infrastructure\InvestmentHub.Infrastructure.csproj" />
-    <ProjectReference Include="..\InvestmentHub.Web\InvestmentHub.Web.csproj" />
     <ProjectReference Include="..\..\host\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
     <ProjectReference Include="..\InvestmentHub.Domain\InvestmentHub.Domain.csproj" />
   </ItemGroup>

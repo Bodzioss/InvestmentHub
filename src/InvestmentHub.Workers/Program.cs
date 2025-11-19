@@ -1,6 +1,6 @@
+using InvestmentHub.Infrastructure.Data;
 using InvestmentHub.Workers;
 using Microsoft.EntityFrameworkCore;
-using InvestmentHub.Web.Data;
 
 var builder = Host.CreateApplicationBuilder(args);
 

@@ -1,0 +1,83 @@
+@using Fluxor
+@using InvestmentHub.Contracts
+@using InvestmentHub.Web.Client.Store.User
+@inject IDispatcher Dispatcher
+@inject IState<UserState> UserState
+
+<MudSelect T="string" 
+           Label="Select User" 
+           Value="@UserState.Value.SelectedUserId" 
+           ValueChanged="@OnUserChanged"
+           Variant="Variant.Outlined" 
+           Margin="Margin.Dense" 
+           Dense="true"
+           Class="user-selector"
+           AdornmentColor="Color.Inherit">
+    
+    @if (UserState.Value.IsLoading)
+    {
+        <MudSelectItem Value="@((string?)null)" Disabled="true">Loading users...</MudSelectItem>
+    }
+    else if (!UserState.Value.Users.Any())
+    {
+        <MudSelectItem Value="@((string?)null)" Disabled="true">No users found</MudSelectItem>
+    }
+    else
+    {
+        @foreach (var user in UserState.Value.Users)
+        {
+            <MudSelectItem Value="@user.Id">@user.Name</MudSelectItem>
+        }
+    }
+</MudSelect>
+
+<style>
+    .user-selector {
+        min-width: 200px;
+        margin-right: 16px;
+    }
+    
+    /* Custom styling to make it look good in AppBar */
+    .mud-input-control.mud-input-control-margin-dense {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+    
+    .mud-input-outlined-border {
+        color: rgba(255,255,255, 0.5) !important;
+    }
+    
+    .mud-input-label-outlined {
+        color: rgba(255,255,255, 0.7) !important;
+    }
+    
+    .mud-select .mud-input-slot {
+        color: white !important;
+    }
+    
+    .mud-icon-root {
+        color: white !important;
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Load users when component initializes
+        if (!UserState.Value.Users.Any() && !UserState.Value.IsLoading)
+        {
+            Dispatcher.Dispatch(new LoadUsersAction());
+        }
+        
+        base.OnInitialized();
+    }
+
+    private void OnUserChanged(string userId)
+    {
+        if (!string.IsNullOrEmpty(userId))
+        {
+            Dispatcher.Dispatch(new SelectUserAction(userId));
+        }
+    }
+}
+

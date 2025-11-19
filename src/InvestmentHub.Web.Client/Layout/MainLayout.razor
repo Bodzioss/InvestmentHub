@@ -1,0 +1,57 @@
+﻿@inherits LayoutComponentBase
+@using InvestmentHub.Web.Client.Services
+@inject LayoutService LayoutService
+
+<MudThemeProvider Theme="@_theme" IsDarkMode="@LayoutService.IsDarkMode" />
+<MudPopoverProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h5" Class="ml-3">Investment Hub</MudText>
+        <MudSpacer />
+        <UserSelector />
+        <MudIconButton Icon="@(LayoutService.IsDarkMode ? Icons.Material.Filled.Brightness7 : Icons.Material.Filled.Brightness4)" 
+                       Color="Color.Inherit" 
+                       OnClick="@LayoutService.ToggleDarkMode" />
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private MudTheme _theme = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        LayoutService.MajorUpdateOccured += (s, e) => StateHasChanged();
+        await LayoutService.LoadUserPreferences();
+        
+        _theme = new MudTheme()
+        {
+            PaletteLight = new PaletteLight()
+            {
+                Primary = Colors.Blue.Default,
+                Secondary = Colors.Green.Accent4,
+                AppbarBackground = Colors.Blue.Darken1,
+            },
+            PaletteDark = new PaletteDark()
+            {
+                Primary = Colors.Blue.Lighten1,
+            }
+        };
+        LayoutService.SetBaseTheme(_theme);
+    }
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}

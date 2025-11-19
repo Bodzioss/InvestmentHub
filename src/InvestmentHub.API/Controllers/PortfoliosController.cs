@@ -4,7 +4,7 @@ using InvestmentHub.Domain.Commands;
 using InvestmentHub.Domain.Queries;
 using InvestmentHub.Domain.ValueObjects;
 using AutoMapper;
-using InvestmentHub.API.DTOs;
+using InvestmentHub.Contracts;
 
 namespace InvestmentHub.API.Controllers;
 

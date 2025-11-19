@@ -4,7 +4,7 @@ using InvestmentHub.Domain.Entities;
 using InvestmentHub.Domain.ValueObjects;
 using InvestmentHub.Domain.Enums;
 using InvestmentHub.API.Controllers;
-using InvestmentHub.API.DTOs;
+using InvestmentHub.Contracts;
 using InvestmentHub.Domain.Repositories;
 using InvestmentHub.Domain.Queries;
 

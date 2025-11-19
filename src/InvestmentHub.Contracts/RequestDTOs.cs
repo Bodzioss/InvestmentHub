@@ -1,4 +1,4 @@
-namespace InvestmentHub.API.DTOs;
+namespace InvestmentHub.Contracts;
 
 /// <summary>
 /// Request DTO for adding a new investment.

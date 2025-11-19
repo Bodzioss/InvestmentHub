@@ -1,0 +1,133 @@
+@using InvestmentHub.Contracts
+@using InvestmentHub.Web.Client.Store.User
+@using InvestmentHub.Web.Client.Store.Portfolio
+@using InvestmentHub.Web.Client.Services
+@using Fluxor
+@using MudBlazor
+@inject IState<UserState> UserState
+@inject IDispatcher Dispatcher
+@inject IPortfoliosApi PortfoliosApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Create New Portfolio</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid" @bind-Errors="@_errors">
+            <MudTextField @bind-Value="_portfolioName" 
+                         Label="Portfolio Name" 
+                         Required="true" 
+                         RequiredError="Portfolio name is required"
+                         MaxLength="100"
+                         Counter="MaxLength"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Normal" />
+
+            <MudTextField @bind-Value="_description" 
+                         Label="Description (Optional)" 
+                         MaxLength="500"
+                         Counter="MaxLength"
+                         Lines="3"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Normal" />
+
+            <MudSelect @bind-Value="_currency" 
+                      Label="Currency" 
+                      Required="true"
+                      RequiredError="Currency is required"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Normal">
+                <MudSelectItem Value="@("USD")">USD - US Dollar</MudSelectItem>
+                <MudSelectItem Value="@("EUR")">EUR - Euro</MudSelectItem>
+                <MudSelectItem Value="@("PLN")">PLN - Polish Zloty</MudSelectItem>
+            </MudSelect>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit" 
+                   Disabled="@(!_isValid || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Creating...</MudText>
+            }
+            else
+            {
+                <MudText>Create</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+
+    private MudForm? _form;
+    private bool _isValid;
+    private string[] _errors = Array.Empty<string>();
+    private string _portfolioName = string.Empty;
+    private string? _description;
+    private string _currency = "USD";
+    private bool _isSubmitting = false;
+
+    private async Task Submit()
+    {
+        if (UserState.Value.SelectedUserId == null)
+        {
+            Snackbar.Add("Please select a user first", Severity.Warning);
+            return;
+        }
+
+        await _form!.Validate();
+        if (!_isValid)
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var request = new CreatePortfolioRequest
+            {
+                Name = _portfolioName,
+                Description = _description,
+                OwnerId = UserState.Value.SelectedUserId
+            };
+
+            var portfolio = await ApiErrorHandler.HandleApiCall(() => PortfoliosApi.CreatePortfolioAsync(request));
+
+            Snackbar.Add($"Portfolio '{portfolio.Name}' created successfully!", Severity.Success);
+
+            // Reload portfolios for the current user
+            Dispatcher.Dispatch(new LoadPortfoliosAction(UserState.Value.SelectedUserId));
+
+            MudDialog.Close(DialogResult.Ok(portfolio));
+        }
+        catch (InvestmentHubApiException ex)
+        {
+            Snackbar.Add(ex.GetUserFriendlyMessage(), Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to create portfolio: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}
+

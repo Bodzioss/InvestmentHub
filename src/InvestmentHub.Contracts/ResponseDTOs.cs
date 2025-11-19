@@ -1,4 +1,4 @@
-namespace InvestmentHub.API.DTOs;
+namespace InvestmentHub.Contracts;
 
 /// <summary>
 /// Response DTO for Investment entity.

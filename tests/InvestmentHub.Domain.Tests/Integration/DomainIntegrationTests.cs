@@ -120,7 +120,7 @@ public class DomainIntegrationTests
     }
     
     [Fact]
-    public async Task PortfolioStatusChanges_ShouldEnforceBusinessRules()
+    public void PortfolioStatusChanges_ShouldEnforceBusinessRules()
     {
         // Arrange
         var portfolio = new Portfolio(PortfolioId.New(), "Test Portfolio", "Status test", UserId.New());
@@ -144,7 +144,7 @@ public class DomainIntegrationTests
     }
     
     [Fact]
-    public async Task InvestmentStatusChanges_ShouldEnforceBusinessRules()
+    public void InvestmentStatusChanges_ShouldEnforceBusinessRules()
     {
         // Arrange
         var investment = CreateInvestment("AAPL", "NASDAQ", AssetType.Stock, 150m, 10m);
@@ -169,7 +169,7 @@ public class DomainIntegrationTests
     }
     
     [Fact]
-    public async Task MoneyOperations_ShouldEnforceInvariants()
+    public void MoneyOperations_ShouldEnforceInvariants()
     {
         // Arrange
         var usd100 = new Money(100m, Currency.USD);
@@ -199,7 +199,7 @@ public class DomainIntegrationTests
     }
     
     [Fact]
-    public async Task SymbolValidation_ShouldEnforceInvariants()
+    public void SymbolValidation_ShouldEnforceInvariants()
     {
         // Act & Assert - Cannot create symbol with empty ticker
         var emptyTickerAction = () => new Symbol("", "NASDAQ", AssetType.Stock);

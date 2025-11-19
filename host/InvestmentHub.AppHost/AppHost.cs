@@ -14,11 +14,10 @@ var api = builder.AddProject<Projects.InvestmentHub_API>("api")
     .WithReference(redis)
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "https");
 
-// Add Web service
-var web = builder.AddProject<Projects.InvestmentHub_Web>("web")
-    .WithReference(postgres)
-    .WithReference(redis)
+// Add Web Client (Blazor WASM)
+var webClient = builder.AddProject<Projects.InvestmentHub_Web_Client>("webclient")
     .WithReference(api)
+    .WithEnvironment("ApiSettings__BaseUrl", api.GetEndpoint("https")) // Pass API URL to frontend
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "https");
 
 // Add Workers service

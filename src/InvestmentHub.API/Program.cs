@@ -58,6 +58,18 @@ builder.Services.AddScoped<IPortfolioValuationService, PortfolioValuationService
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
+});
+
 // Add API services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -106,7 +118,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 // Add middleware
-app.UseCors();
+app.UseCors("AllowAll");
 app.UseResponseCompression();
 
 // Map default endpoints (health checks)

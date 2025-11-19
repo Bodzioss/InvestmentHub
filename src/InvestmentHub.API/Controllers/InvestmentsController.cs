@@ -5,7 +5,7 @@ using InvestmentHub.Domain.Queries;
 using InvestmentHub.Domain.ValueObjects;
 using InvestmentHub.Domain.Enums;
 using AutoMapper;
-using InvestmentHub.API.DTOs;
+using InvestmentHub.Contracts;
 
 namespace InvestmentHub.API.Controllers;
 

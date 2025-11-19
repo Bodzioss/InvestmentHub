@@ -17,8 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 🎨 Frontend -->
-    <ProjectReference Include="..\..\src\InvestmentHub.Web\InvestmentHub.Web.csproj" />
+    <!-- 🎨 Frontend (Blazor WASM) -->
+    <ProjectReference Include="..\..\src\InvestmentHub.Web.Client\InvestmentHub.Web.Client.csproj" />
     
     <!-- 🌐 API Layer -->
     <ProjectReference Include="..\..\src\InvestmentHub.API\InvestmentHub.API.csproj" />

@@ -57,6 +57,55 @@ public static class ApiErrorHandler
         }
     }
 
+    /// <summary>
+    /// Handle API exception for void methods and throw user-friendly InvestmentHubApiException
+    /// </summary>
+    public static async Task HandleApiCall(Func<Task> apiCall)
+    {
+        try
+        {
+            await apiCall();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new InvestmentHubApiException(
+                HttpStatusCode.Unauthorized,
+                "Your session has expired. Please login again.",
+                ex);
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            var content = await GetResponseContent(ex);
+            throw new InvestmentHubApiException(
+                HttpStatusCode.NotFound,
+                "The requested resource was not found.",
+                content);
+        }
+        catch (Refit.ApiException ex)
+        {
+            var message = await TryGetErrorMessage(ex);
+            var content = await GetResponseContent(ex);
+            throw new InvestmentHubApiException(
+                ex.StatusCode,
+                message ?? "An error occurred while communicating with the server.",
+                content);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvestmentHubApiException(
+                HttpStatusCode.ServiceUnavailable,
+                "Unable to connect to the server. Please check your connection.",
+                ex);
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new InvestmentHubApiException(
+                HttpStatusCode.RequestTimeout,
+                "The request timed out. Please try again.",
+                ex);
+        }
+    }
+
     private static Task<string?> GetResponseContent(Refit.ApiException ex)
     {
         try

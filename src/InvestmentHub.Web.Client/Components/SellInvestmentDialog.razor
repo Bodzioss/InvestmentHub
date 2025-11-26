@@ -1,0 +1,206 @@
+@using InvestmentHub.Contracts
+@using InvestmentHub.Web.Client.Store.Investment
+@using InvestmentHub.Web.Client.Services
+@using Fluxor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Sell Investment</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudGrid>
+                <!-- Investment Info -->
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <div>
+                                <MudText Typo="Typo.h6">@Investment.Symbol.Ticker</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    @Investment.Symbol.Exchange · @Investment.Symbol.AssetType
+                                </MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Available Quantity</MudText>
+                                <MudText Typo="Typo.h6">@Investment.Quantity.ToString("N2")</MudText>
+                            </div>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Sale Information -->
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_quantityToSell" 
+                                    Label="Quantity to Sell" 
+                                    Required="true" 
+                                    RequiredError="Quantity is required"
+                                    Min="0.00000001m"
+                                    Max="@Investment.Quantity"
+                                    Variant="Variant.Outlined" 
+                                    Format="N8"
+                                    HelperText="Leave empty or enter full amount to sell all" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_salePrice" 
+                                    Label="Sale Price (per unit)" 
+                                    Required="true" 
+                                    RequiredError="Sale price is required"
+                                    Min="0.01m"
+                                    Variant="Variant.Outlined" 
+                                    Format="N2"
+                                    Adornment="Adornment.Start"
+                                    AdornmentText="@Investment.CurrentValue.Currency" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudDatePicker @bind-Date="_saleDate" 
+                                  Label="Sale Date" 
+                                  Required="true"
+                                  RequiredError="Sale date is required"
+                                  Variant="Variant.Outlined"
+                                  MaxDate="DateTime.Today" />
+                </MudItem>
+
+                <!-- Summary -->
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4 mt-2" Elevation="0" Outlined="true">
+                        <MudStack Spacing="2">
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Sale Proceeds</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Primary">
+                                    @((_quantityToSell * _salePrice).ToString("N2")) @Investment.CurrentValue.Currency
+                                </MudText>
+                            </div>
+                            <MudDivider />
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Purchase Cost</MudText>
+                                <MudText Typo="Typo.body1">
+                                    @((_quantityToSell * Investment.PurchasePrice.Amount).ToString("N2")) @Investment.PurchasePrice.Currency
+                                </MudText>
+                            </div>
+                            <MudDivider />
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Realized Gain/Loss</MudText>
+                                @{
+                                    var gainLoss = (_salePrice - Investment.PurchasePrice.Amount) * _quantityToSell;
+                                    var percentage = Investment.PurchasePrice.Amount > 0 
+                                        ? ((_salePrice - Investment.PurchasePrice.Amount) / Investment.PurchasePrice.Amount * 100) 
+                                        : 0;
+                                }
+                                <MudText Typo="Typo.h6" Color="@GetGainLossColor(gainLoss)">
+                                    @gainLoss.ToString("N2") (@percentage.ToString("N2")%)
+                                </MudText>
+                            </div>
+                            @if (_quantityToSell < Investment.Quantity)
+                            {
+                                <MudDivider />
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Remaining Quantity</MudText>
+                                    <MudText Typo="Typo.body1">
+                                        @((Investment.Quantity - _quantityToSell).ToString("N2"))
+                                    </MudText>
+                                </div>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Warning" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit" 
+                   Disabled="@(!_isValid || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Selling...</MudText>
+            }
+            else
+            {
+                <MudText>Sell</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public InvestmentResponseDto Investment { get; set; } = null!;
+
+    [Inject]
+    private IDispatcher Dispatcher { get; set; } = null!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+
+    private decimal _quantityToSell;
+    private decimal _salePrice;
+    private DateTime? _saleDate = DateTime.Today;
+
+    protected override void OnInitialized()
+    {
+        _quantityToSell = Investment.Quantity; // Default to selling all
+        _salePrice = Investment.CurrentValue.Amount;
+        base.OnInitialized();
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        if (!_isValid || _isSubmitting || !_saleDate.HasValue)
+            return;
+
+        _isSubmitting = true;
+
+        try
+        {
+            var request = new SellInvestmentRequest
+            {
+                InvestmentId = Investment.Id,
+                SalePrice = new MoneyRequest
+                {
+                    Amount = _salePrice,
+                    Currency = Investment.CurrentValue.Currency
+                },
+                QuantityToSell = _quantityToSell >= Investment.Quantity ? null : _quantityToSell,
+                SaleDate = _saleDate.Value
+            };
+
+            Dispatcher.Dispatch(new SellInvestmentAction(Investment.Id, request));
+
+            Snackbar.Add($"Investment sold successfully!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error selling investment: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private Color GetGainLossColor(decimal amount)
+    {
+        if (amount > 0) return Color.Success;
+        if (amount < 0) return Color.Error;
+        return Color.Default;
+    }
+}
+

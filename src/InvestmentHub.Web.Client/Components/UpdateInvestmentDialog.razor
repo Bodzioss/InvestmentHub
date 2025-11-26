@@ -1,0 +1,170 @@
+@using InvestmentHub.Contracts
+@using InvestmentHub.Web.Client.Store.Investment
+@using InvestmentHub.Web.Client.Services
+@using Fluxor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Update Investment Value</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudGrid>
+                <!-- Investment Info -->
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <div>
+                                <MudText Typo="Typo.h6">@Investment.Symbol.Ticker</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    @Investment.Symbol.Exchange · @Investment.Symbol.AssetType
+                                </MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Current Value</MudText>
+                                <MudText Typo="Typo.h6">
+                                    @Investment.CurrentValue.Amount.ToString("N2") @Investment.CurrentValue.Currency
+                                </MudText>
+                            </div>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- New Price -->
+                <MudItem xs="12">
+                    <MudNumericField @bind-Value="_newPrice" 
+                                    Label="New Current Price (per unit)" 
+                                    Required="true" 
+                                    RequiredError="Price is required"
+                                    Min="0.01m"
+                                    Variant="Variant.Outlined" 
+                                    Format="N2"
+                                    Adornment="Adornment.Start"
+                                    AdornmentText="@Investment.CurrentValue.Currency"
+                                    HelperText="Enter the current market price per unit" />
+                </MudItem>
+
+                <!-- Summary -->
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4 mt-2" Elevation="0" Outlined="true">
+                        <MudStack Spacing="2">
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Quantity</MudText>
+                                <MudText Typo="Typo.body1">@Investment.Quantity.ToString("N2")</MudText>
+                            </div>
+                            <MudDivider />
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">New Total Value</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Primary">
+                                    @((_newPrice * Investment.Quantity).ToString("N2")) @Investment.CurrentValue.Currency
+                                </MudText>
+                            </div>
+                            <MudDivider />
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Change</MudText>
+                                @{
+                                    var change = (_newPrice - Investment.CurrentValue.Amount) * Investment.Quantity;
+                                    var changePercent = Investment.CurrentValue.Amount > 0 
+                                        ? ((_newPrice - Investment.CurrentValue.Amount) / Investment.CurrentValue.Amount * 100) 
+                                        : 0;
+                                }
+                                <MudText Typo="Typo.body1" Color="@GetChangeColor(change)">
+                                    @change.ToString("N2") (@changePercent.ToString("N2")%)
+                                </MudText>
+                            </div>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit" 
+                   Disabled="@(!_isValid || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Updating...</MudText>
+            }
+            else
+            {
+                <MudText>Update</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public InvestmentResponseDto Investment { get; set; } = null!;
+
+    [Inject]
+    private IDispatcher Dispatcher { get; set; } = null!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+    private decimal _newPrice;
+
+    protected override void OnInitialized()
+    {
+        _newPrice = Investment.CurrentValue.Amount;
+        base.OnInitialized();
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        if (!_isValid || _isSubmitting)
+            return;
+
+        _isSubmitting = true;
+
+        try
+        {
+            var request = new UpdateInvestmentValueRequest
+            {
+                InvestmentId = Investment.Id,
+                CurrentPrice = new MoneyRequest
+                {
+                    Amount = _newPrice,
+                    Currency = Investment.CurrentValue.Currency
+                }
+            };
+
+            Dispatcher.Dispatch(new UpdateInvestmentValueAction(Investment.Id, request));
+
+            Snackbar.Add($"Investment value updated successfully!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error updating investment: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private Color GetChangeColor(decimal change)
+    {
+        if (change > 0) return Color.Success;
+        if (change < 0) return Color.Error;
+        return Color.Default;
+    }
+}
+

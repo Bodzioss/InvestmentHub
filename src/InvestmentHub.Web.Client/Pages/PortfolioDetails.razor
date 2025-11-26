@@ -1,0 +1,353 @@
+@page "/portfolio/{PortfolioId}"
+@using Fluxor
+@using InvestmentHub.Web.Client.Store.Portfolio
+@using InvestmentHub.Web.Client.Store.Investment
+@using InvestmentHub.Web.Client.Store.User
+@using InvestmentHub.Contracts
+@using InvestmentHub.Web.Client.Components
+@inject IState<PortfolioState> PortfolioState
+@inject IState<InvestmentState> InvestmentState
+@inject IState<UserState> UserState
+@inject IDispatcher Dispatcher
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Portfolio Details</PageTitle>
+
+@if (_currentPortfolio == null)
+{
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudAlert Severity="Severity.Warning">Portfolio not found</MudAlert>
+        <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4">
+            Back to Dashboard
+        </MudButton>
+    </MudContainer>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge">
+        <!-- Portfolio Header -->
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <div>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" 
+                                      Color="Color.Default" 
+                                      Href="/" />
+                        <div>
+                            <MudText Typo="Typo.h4">@_currentPortfolio.Name</MudText>
+                            @if (!string.IsNullOrEmpty(_currentPortfolio.Description))
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@_currentPortfolio.Description</MudText>
+                            }
+                        </div>
+                    </MudStack>
+                </div>
+                <MudButton Variant="Variant.Filled" 
+                          Color="Color.Primary" 
+                          StartIcon="@Icons.Material.Filled.Add"
+                          OnClick="OpenAddInvestmentDialog">
+                    Add Investment
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        <!-- Portfolio Summary Cards -->
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="1">
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Value</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">
+                            @(_currentPortfolio.TotalValue?.Amount.ToString("N2") ?? "0.00") @(_currentPortfolio.TotalValue?.Currency ?? "USD")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="1">
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Cost</MudText>
+                        <MudText Typo="Typo.h5">
+                            @(_currentPortfolio.TotalCost?.Amount.ToString("N2") ?? "0.00") @(_currentPortfolio.TotalCost?.Currency ?? "USD")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="1">
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Gain/Loss</MudText>
+                        <MudText Typo="Typo.h5" Color="@GetGainLossColor(_currentPortfolio.UnrealizedGainLoss?.Amount ?? 0)">
+                            @(_currentPortfolio.UnrealizedGainLoss?.Amount.ToString("N2") ?? "0.00") @(_currentPortfolio.UnrealizedGainLoss?.Currency ?? "USD")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="1">
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Active Investments</MudText>
+                        <MudText Typo="Typo.h5">@_currentPortfolio.ActiveInvestmentCount</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Investments Table -->
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">Investments</MudText>
+
+            @if (InvestmentState.Value.IsLoading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (!InvestmentState.Value.Investments.Any())
+            {
+                <MudPaper Class="pa-8" Elevation="0" Outlined="true">
+                    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Color="Color.Default" />
+                        <MudText Typo="Typo.h6">No investments yet</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-4">Add your first investment to start tracking your portfolio.</MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddInvestmentDialog">
+                            Add Investment
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+            }
+            else
+            {
+                <MudTable Items="@InvestmentState.Value.Investments" 
+                         Hover="true" 
+                         Striped="true" 
+                         Dense="true"
+                         Breakpoint="Breakpoint.Sm">
+                    <HeaderContent>
+                        <MudTh>Symbol</MudTh>
+                        <MudTh>Type</MudTh>
+                        <MudTh>Quantity</MudTh>
+                        <MudTh>Purchase Price</MudTh>
+                        <MudTh>Current Value</MudTh>
+                        <MudTh>Total Value</MudTh>
+                        <MudTh>Gain/Loss</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Purchase Date</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Symbol">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.Symbol.Ticker</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Symbol.Exchange</MudText>
+                            </MudStack>
+                        </MudTd>
+                        <MudTd DataLabel="Type">
+                            <MudChip T="string" Size="Size.Small" Color="GetAssetTypeColor(context.Symbol.AssetType)">
+                                @context.Symbol.AssetType
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Quantity">@context.Quantity.ToString("N2")</MudTd>
+                        <MudTd DataLabel="Purchase Price">
+                            @context.PurchasePrice.Amount.ToString("N2") @context.PurchasePrice.Currency
+                        </MudTd>
+                        <MudTd DataLabel="Current Value">
+                            @context.CurrentValue.Amount.ToString("N2") @context.CurrentValue.Currency
+                        </MudTd>
+                        <MudTd DataLabel="Total Value">
+                            @((context.CurrentValue.Amount * context.Quantity).ToString("N2")) @context.CurrentValue.Currency
+                        </MudTd>
+                        <MudTd DataLabel="Gain/Loss">
+                            @{
+                                var gainLoss = (context.CurrentValue.Amount - context.PurchasePrice.Amount) * context.Quantity;
+                                var percentage = context.PurchasePrice.Amount > 0 
+                                    ? ((context.CurrentValue.Amount - context.PurchasePrice.Amount) / context.PurchasePrice.Amount * 100) 
+                                    : 0;
+                            }
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.body2" Color="@GetGainLossColor(gainLoss)">
+                                    @gainLoss.ToString("N2")
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="@GetGainLossColor(gainLoss)">
+                                    (@percentage.ToString("N2")%)
+                                </MudText>
+                            </MudStack>
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">
+                                @context.Status
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Purchase Date">@context.PurchaseDate.ToShortDateString()</MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudStack Row="true" Spacing="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                             Size="Size.Small" 
+                                             Color="Color.Primary"
+                                             OnClick="@(() => OpenUpdateInvestmentDialog(context))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.TrendingDown" 
+                                             Size="Size.Small" 
+                                             Color="Color.Warning"
+                                             OnClick="@(() => OpenSellInvestmentDialog(context))" 
+                                             Disabled="@(context.Status != "Active")" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                             Size="Size.Small" 
+                                             Color="Color.Error"
+                                             OnClick="@(() => DeleteInvestment(context))" />
+                            </MudStack>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudContainer>
+}
+
+@code {
+    [Parameter]
+    public string PortfolioId { get; set; } = string.Empty;
+
+    private PortfolioResponseDto? _currentPortfolio;
+
+    protected override void OnInitialized()
+    {
+        // Subscribe to state changes
+        PortfolioState.StateChanged += (sender, args) => OnStateChanged();
+        InvestmentState.StateChanged += (sender, args) => StateHasChanged();
+        
+        base.OnInitialized();
+    }
+
+    protected override void OnParametersSet()
+    {
+        LoadPortfolioAndInvestments();
+        base.OnParametersSet();
+    }
+
+    private void OnStateChanged()
+    {
+        _currentPortfolio = PortfolioState.Value.Portfolios.FirstOrDefault(p => p.Id == PortfolioId);
+        StateHasChanged();
+    }
+
+    private void LoadPortfolioAndInvestments()
+    {
+        // Find the portfolio from the store
+        _currentPortfolio = PortfolioState.Value.Portfolios.FirstOrDefault(p => p.Id == PortfolioId);
+
+        // Load investments for this portfolio
+        if (!string.IsNullOrEmpty(PortfolioId))
+        {
+            Dispatcher.Dispatch(new LoadInvestmentsAction(PortfolioId));
+        }
+    }
+
+    private async Task OpenAddInvestmentDialog()
+    {
+        if (string.IsNullOrEmpty(PortfolioId))
+            return;
+
+        var parameters = new DialogParameters
+        {
+            { "PortfolioId", PortfolioId }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true, 
+            MaxWidth = MaxWidth.Medium, 
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<AddInvestmentDialog>("Add Investment", parameters, options);
+        await dialog.Result;
+    }
+
+    private async Task OpenUpdateInvestmentDialog(InvestmentResponseDto investment)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Investment", investment }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true, 
+            MaxWidth = MaxWidth.Medium, 
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<UpdateInvestmentDialog>("Update Investment Value", parameters, options);
+        await dialog.Result;
+    }
+
+    private async Task OpenSellInvestmentDialog(InvestmentResponseDto investment)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Investment", investment }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true, 
+            MaxWidth = MaxWidth.Medium, 
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<SellInvestmentDialog>("Sell Investment", parameters, options);
+        await dialog.Result;
+    }
+
+    private async Task DeleteInvestment(InvestmentResponseDto investment)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Confirm Delete",
+            $"Are you sure you want to delete the investment in {investment.Symbol.Ticker}?",
+            yesText: "Delete",
+            cancelText: "Cancel"
+        );
+
+        if (result == true)
+        {
+            Dispatcher.Dispatch(new DeleteInvestmentAction(investment.Id));
+            
+            // Reload investments after a short delay
+            await Task.Delay(500);
+            Dispatcher.Dispatch(new LoadInvestmentsAction(PortfolioId));
+            
+            Snackbar.Add($"Investment {investment.Symbol.Ticker} deleted", Severity.Success);
+        }
+    }
+
+    private Color GetGainLossColor(decimal amount)
+    {
+        if (amount > 0) return Color.Success;
+        if (amount < 0) return Color.Error;
+        return Color.Default;
+    }
+
+    private Color GetAssetTypeColor(string assetType)
+    {
+        return assetType.ToLower() switch
+        {
+            "stock" => Color.Primary,
+            "bond" => Color.Secondary,
+            "crypto" => Color.Tertiary,
+            "etf" => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private Color GetStatusColor(string status)
+    {
+        return status.ToLower() switch
+        {
+            "active" => Color.Success,
+            "sold" => Color.Warning,
+            "closed" => Color.Default,
+            _ => Color.Default
+        };
+    }
+}
+

@@ -100,6 +100,19 @@ builder.Services.AddMediatR(cfg =>
 
 var app = builder.Build();
 
+// Log Seq configuration status
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var seqUrl = app.Configuration["Seq:ServerUrl"];
+if (!string.IsNullOrEmpty(seqUrl))
+{
+    logger.LogInformation("Seq logging configured and enabled. Seq Server URL: {SeqUrl}", seqUrl);
+    logger.LogInformation("Structured logging to Seq is active. Check Seq UI at {SeqUrl} to view logs.", seqUrl);
+}
+else
+{
+    logger.LogWarning("Seq logging is not configured. Set 'Seq:ServerUrl' in configuration to enable Seq.");
+}
+
 // Ensure database is created and seeded
 using (var scope = app.Services.CreateScope())
 {

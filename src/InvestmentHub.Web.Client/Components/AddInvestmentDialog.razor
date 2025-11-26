@@ -1,0 +1,201 @@
+@using InvestmentHub.Contracts
+@using InvestmentHub.Web.Client.Store.Investment
+@using InvestmentHub.Web.Client.Services
+@using Fluxor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add New Investment</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudGrid>
+                <!-- Symbol Information -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Symbol Information</MudText>
+                </MudItem>
+                
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_ticker" 
+                                 Label="Ticker Symbol" 
+                                 Required="true" 
+                                 RequiredError="Ticker is required"
+                                 Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_exchange" 
+                                 Label="Exchange" 
+                                 Required="true" 
+                                 RequiredError="Exchange is required"
+                                 Variant="Variant.Outlined" 
+                                 Placeholder="e.g., NYSE, NASDAQ" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect @bind-Value="_assetType" 
+                              Label="Asset Type" 
+                              Required="true"
+                              RequiredError="Asset type is required"
+                              Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("Stock")">Stock</MudSelectItem>
+                        <MudSelectItem Value="@("Bond")">Bond</MudSelectItem>
+                        <MudSelectItem Value="@("ETF")">ETF</MudSelectItem>
+                        <MudSelectItem Value="@("Crypto")">Cryptocurrency</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <!-- Purchase Information -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2 mt-4">Purchase Information</MudText>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_quantity" 
+                                    Label="Quantity" 
+                                    Required="true" 
+                                    RequiredError="Quantity is required"
+                                    Min="0.00000001m"
+                                    Variant="Variant.Outlined" 
+                                    Format="N8" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_purchasePrice" 
+                                    Label="Purchase Price (per unit)" 
+                                    Required="true" 
+                                    RequiredError="Purchase price is required"
+                                    Min="0.01m"
+                                    Variant="Variant.Outlined" 
+                                    Format="N2"
+                                    Adornment="Adornment.Start"
+                                    AdornmentText="@_currency" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect @bind-Value="_currency" 
+                              Label="Currency" 
+                              Required="true"
+                              Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("USD")">USD</MudSelectItem>
+                        <MudSelectItem Value="@("EUR")">EUR</MudSelectItem>
+                        <MudSelectItem Value="@("PLN")">PLN</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_purchaseDate" 
+                                  Label="Purchase Date" 
+                                  Required="true"
+                                  RequiredError="Purchase date is required"
+                                  Variant="Variant.Outlined"
+                                  MaxDate="DateTime.Today" />
+                </MudItem>
+
+                <!-- Summary -->
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4 mt-2" Elevation="0" Outlined="true">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Investment</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">
+                            @((_quantity * _purchasePrice).ToString("N2")) @_currency
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit" 
+                   Disabled="@(!_isValid || _isSubmitting)">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Adding...</MudText>
+            }
+            else
+            {
+                <MudText>Add Investment</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public string PortfolioId { get; set; } = string.Empty;
+
+    [Inject]
+    private IDispatcher Dispatcher { get; set; } = null!;
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSubmitting;
+
+    // Symbol fields
+    private string _ticker = string.Empty;
+    private string _exchange = string.Empty;
+    private string _assetType = "Stock";
+
+    // Purchase fields
+    private decimal _quantity = 1;
+    private decimal _purchasePrice = 0;
+    private string _currency = "USD";
+    private DateTime? _purchaseDate = DateTime.Today;
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        if (!_isValid || _isSubmitting || !_purchaseDate.HasValue)
+            return;
+
+        _isSubmitting = true;
+
+        try
+        {
+            var request = new AddInvestmentRequest
+            {
+                PortfolioId = PortfolioId,
+                Symbol = new SymbolRequest
+                {
+                    Ticker = _ticker.ToUpper(),
+                    Exchange = _exchange.ToUpper(),
+                    AssetType = _assetType
+                },
+                PurchasePrice = new MoneyRequest
+                {
+                    Amount = _purchasePrice,
+                    Currency = _currency
+                },
+                Quantity = _quantity,
+                PurchaseDate = _purchaseDate.Value
+            };
+
+            Dispatcher.Dispatch(new AddInvestmentAction(request));
+
+            Snackbar.Add($"Investment in {_ticker} added successfully!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error adding investment: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}
+

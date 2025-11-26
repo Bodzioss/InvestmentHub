@@ -148,7 +148,7 @@ public static class Extensions
     public static TBuilder ConfigureSerilog<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         // Configure Serilog
-        Log.Logger = new LoggerConfiguration()
+        var loggerConfig = new LoggerConfiguration()
             .ReadFrom.Configuration(builder.Configuration)
             .Enrich.FromLogContext()
             .Enrich.WithEnvironmentName()
@@ -172,8 +172,22 @@ public static class Extensions
                     options.Endpoint = otlpEndpoint;
                     options.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
                 }
-            })
-            .CreateLogger();
+            });
+
+        // Add Seq sink conditionally with enhanced configuration for structured logging
+        var seqUrl = builder.Configuration["Seq:ServerUrl"];
+        if (!string.IsNullOrEmpty(seqUrl))
+        {
+            loggerConfig = loggerConfig.WriteTo.Seq(
+                serverUrl: seqUrl,
+                restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information,
+                batchPostingLimit: 1000, // Batch size for better performance
+                period: TimeSpan.FromSeconds(2), // Flush interval
+                eventBodyLimitBytes: 256 * 1024 // 256KB max event size
+            );
+        }
+
+        Log.Logger = loggerConfig.CreateLogger();
 
         // Clear existing providers and use Serilog
         builder.Logging.ClearProviders();

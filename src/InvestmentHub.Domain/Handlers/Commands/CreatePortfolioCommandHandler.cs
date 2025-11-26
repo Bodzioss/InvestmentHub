@@ -21,6 +21,7 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
     private readonly IPortfolioRepository _portfolioRepository;
     private readonly ILogger<CreatePortfolioCommandHandler> _logger;
     private readonly ICorrelationIdEnricher _correlationIdEnricher;
+    private readonly IMetricsRecorder _metricsRecorder;
 
     /// <summary>
     /// Initializes a new instance of the CreatePortfolioCommandHandler class.
@@ -30,18 +31,21 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
     /// <param name="portfolioRepository">The portfolio repository for validation</param>
     /// <param name="logger">The logger</param>
     /// <param name="correlationIdEnricher">The Correlation ID enricher for Marten sessions</param>
+    /// <param name="metricsRecorder">The metrics recorder service</param>
     public CreatePortfolioCommandHandler(
         IDocumentSession session,
         IUserRepository userRepository,
         IPortfolioRepository portfolioRepository,
         ILogger<CreatePortfolioCommandHandler> logger,
-        ICorrelationIdEnricher correlationIdEnricher)
+        ICorrelationIdEnricher correlationIdEnricher,
+        IMetricsRecorder metricsRecorder)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _portfolioRepository = portfolioRepository ?? throw new ArgumentNullException(nameof(portfolioRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _correlationIdEnricher = correlationIdEnricher ?? throw new ArgumentNullException(nameof(correlationIdEnricher));
+        _metricsRecorder = metricsRecorder ?? throw new ArgumentNullException(nameof(metricsRecorder));
     }
 
     /// <summary>
@@ -113,6 +117,12 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
             // 7. Save changes to Marten (persist events + update projections)
             // Extension method automatically adds OpenTelemetry tracing
             await _session.SaveChangesWithTracingAsync(cancellationToken);
+
+            // 8. Record business metrics using extension method
+            portfolioAggregate.RecordMetrics(
+                _metricsRecorder,
+                m => m.RecordPortfolioCreated(),
+                "PortfolioProjection");
 
             _logger.LogInformation("Successfully created portfolio {PortfolioId} with {EventCount} events", 
                 request.PortfolioId.Value, portfolioAggregate.GetUncommittedEvents().Count());

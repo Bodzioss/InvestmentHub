@@ -69,12 +69,29 @@ public static class Extensions
             logging.IncludeScopes = true;
         });
 
-        builder.Services.AddOpenTelemetry()
+        var aspireDashboardEndpoint = builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"];
+        // Use JAEGER_OTLP_ENDPOINT instead of OTEL_EXPORTER_OTLP_ENDPOINT to avoid redirecting metrics from Aspire Dashboard
+        var jaegerEndpoint = builder.Configuration["JAEGER_OTLP_ENDPOINT"] 
+            ?? builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]; // Fallback for non-Aspire environments
+        var isRunningInAspire = !string.IsNullOrWhiteSpace(aspireDashboardEndpoint);
+
+        var openTelemetryBuilder = builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    // Add custom InvestmentHub metrics
+                    .AddMeter(InvestmentHubMetrics.MeterName);
+                
+                // Export metrics to Aspire Dashboard (required for metrics to be visible)
+                if (isRunningInAspire && !string.IsNullOrWhiteSpace(aspireDashboardEndpoint))
+                {
+                    metrics.AddOtlpExporter(options =>
+                    {
+                        options.Endpoint = new Uri(aspireDashboardEndpoint);
+                    });
+                }
             })
             .WithTracing(tracing =>
             {
@@ -92,29 +109,59 @@ public static class Extensions
                     // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                     //.AddGrpcClientInstrumentation()
                     .AddHttpClientInstrumentation();
+                
+                // Export traces to Aspire Dashboard (if in Aspire)
+                if (isRunningInAspire && !string.IsNullOrWhiteSpace(aspireDashboardEndpoint))
+                {
+                    tracing.AddOtlpExporter(options =>
+                    {
+                        options.Endpoint = new Uri(aspireDashboardEndpoint);
+                    });
+                }
+                
+                // Export traces to Jaeger (if endpoint is configured)
+                if (!string.IsNullOrWhiteSpace(jaegerEndpoint))
+                {
+                    tracing.AddOtlpExporter(options =>
+                    {
+                        options.Endpoint = new Uri(jaegerEndpoint);
+                    });
+                }
             });
-
-        builder.AddOpenTelemetryExporters();
 
         return builder;
     }
 
-    private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    private static TBuilder AddOpenTelemetryExporters<TBuilder>(
+        this TBuilder builder, 
+        OpenTelemetryBuilder openTelemetryBuilder) where TBuilder : IHostApplicationBuilder
     {
+        // In Aspire, when running through AppHost, metrics and traces are automatically exported to Aspire Dashboard.
+        // The Aspire Dashboard OTLP endpoint is automatically configured via environment variables.
+        // We only need to configure OTLP exporter if we want to export to an external endpoint (e.g., Jaeger).
+        
         var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-
+        var aspireDashboardEndpoint = builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"];
+        
+        // If running in Aspire (ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL is set), metrics are automatically exported to Dashboard.
+        // We don't need to call UseOtlpExporter() - Aspire handles it automatically.
+        // However, if OTEL_EXPORTER_OTLP_ENDPOINT is also set (for Jaeger), we can export to both.
+        
         if (!string.IsNullOrWhiteSpace(otlpEndpoint))
         {
-            // Configure OTLP exporter for Jaeger
-            // UseOtlpExporter() automatically uses gRPC protocol when endpoint is provided
-            builder.Services.AddOpenTelemetry().UseOtlpExporter();
+            // Export to external OTLP endpoint (e.g., Jaeger)
+            // Note: In Aspire, metrics will still go to Dashboard automatically
+            // UseOtlpExporter() will use the endpoint from OTEL_EXPORTER_OTLP_ENDPOINT environment variable
+            // and default to gRPC protocol
+            openTelemetryBuilder.UseOtlpExporter();
         }
+        // If not in Aspire and no OTLP endpoint is set, OpenTelemetry will use default configuration
+        // (which may not export anywhere, but that's fine for local development)
 
         // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
         //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
         //{
-        //    builder.Services.AddOpenTelemetry()
-        //       .UseAzureMonitor();
+        //    openTelemetryBuilder.UseAzureMonitor();
         //}
 
         return builder;
@@ -163,6 +210,9 @@ public static class Extensions
             .Enrich.WithProcessName()
             .Enrich.WithThreadId()
             .Enrich.WithThreadName()
+            // Add OpenTelemetry TraceId and SpanId to all log entries
+            // This enables correlation between logs (Seq) and traces (Jaeger)
+            .Enrich.With<ActivityTraceEnricher>()
             .WriteTo.Console(
                 outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
             .WriteTo.File(

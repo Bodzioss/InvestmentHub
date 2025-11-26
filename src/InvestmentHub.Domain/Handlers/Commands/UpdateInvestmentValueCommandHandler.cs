@@ -18,6 +18,7 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
     private readonly IDocumentSession _session;
     private readonly ILogger<UpdateInvestmentValueCommandHandler> _logger;
     private readonly ICorrelationIdEnricher _correlationIdEnricher;
+    private readonly IMetricsRecorder _metricsRecorder;
 
     /// <summary>
     /// Initializes a new instance of the UpdateInvestmentValueCommandHandler class.
@@ -25,14 +26,17 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
     /// <param name="session">The Marten document session for event sourcing</param>
     /// <param name="logger">The logger</param>
     /// <param name="correlationIdEnricher">The Correlation ID enricher for Marten sessions</param>
+    /// <param name="metricsRecorder">The metrics recorder service</param>
     public UpdateInvestmentValueCommandHandler(
         IDocumentSession session,
         ILogger<UpdateInvestmentValueCommandHandler> logger,
-        ICorrelationIdEnricher correlationIdEnricher)
+        ICorrelationIdEnricher correlationIdEnricher,
+        IMetricsRecorder metricsRecorder)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _correlationIdEnricher = correlationIdEnricher ?? throw new ArgumentNullException(nameof(correlationIdEnricher));
+        _metricsRecorder = metricsRecorder ?? throw new ArgumentNullException(nameof(metricsRecorder));
     }
 
     /// <summary>
@@ -86,6 +90,12 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
             // 6. Save changes to Marten (persist events + update projections)
             // Extension method automatically adds OpenTelemetry tracing
             await _session.SaveChangesWithTracingAsync(cancellationToken);
+
+            // 7. Record business metrics using extension method
+            investmentAggregate.RecordMetrics(
+                _metricsRecorder,
+                m => m.RecordInvestmentUpdated(),
+                "InvestmentProjection");
 
             _logger.LogInformation("Successfully updated investment {InvestmentId}. New total value: {CurrentValue} {Currency}", 
                 request.InvestmentId.Value, investmentAggregate.CurrentValue.Amount, investmentAggregate.CurrentValue.Currency);

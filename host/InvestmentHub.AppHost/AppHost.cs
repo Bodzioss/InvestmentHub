@@ -28,7 +28,11 @@ var api = builder.AddProject<Projects.InvestmentHub_API>("api")
     .WithReference(redis)
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "https")
     .WithEnvironment("Seq__ServerUrl", seq.GetEndpoint("seq"))
-    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"));
+    // Note: We don't set OTEL_EXPORTER_OTLP_ENDPOINT here because:
+    // - In Aspire, metrics are automatically exported to Aspire Dashboard
+    // - Traces are exported to Jaeger via code configuration (see Extensions.cs)
+    // Setting OTEL_EXPORTER_OTLP_ENDPOINT would redirect metrics to Jaeger instead of Dashboard
+    .WithEnvironment("JAEGER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"));
 
 // Add Web Client (Blazor WASM)
 var webClient = builder.AddProject<Projects.InvestmentHub_Web_Client>("webclient")
@@ -42,6 +46,7 @@ var workers = builder.AddProject<Projects.InvestmentHub_Workers>("workers")
     .WithReference(redis)
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "Workers")
     .WithEnvironment("Seq__ServerUrl", seq.GetEndpoint("seq"))
-    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"));
+    // Note: We don't set OTEL_EXPORTER_OTLP_ENDPOINT here (see API service comment above)
+    .WithEnvironment("JAEGER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"));
 
 builder.Build().Run();

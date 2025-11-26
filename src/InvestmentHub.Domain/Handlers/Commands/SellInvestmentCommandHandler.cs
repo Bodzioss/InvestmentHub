@@ -18,6 +18,7 @@ public class SellInvestmentCommandHandler : IRequestHandler<SellInvestmentComman
     private readonly IDocumentSession _session;
     private readonly ILogger<SellInvestmentCommandHandler> _logger;
     private readonly ICorrelationIdEnricher _correlationIdEnricher;
+    private readonly IMetricsRecorder _metricsRecorder;
 
     /// <summary>
     /// Initializes a new instance of the SellInvestmentCommandHandler class.
@@ -25,14 +26,17 @@ public class SellInvestmentCommandHandler : IRequestHandler<SellInvestmentComman
     /// <param name="session">The Marten document session for event sourcing</param>
     /// <param name="logger">The logger</param>
     /// <param name="correlationIdEnricher">The Correlation ID enricher for Marten sessions</param>
+    /// <param name="metricsRecorder">The metrics recorder service</param>
     public SellInvestmentCommandHandler(
         IDocumentSession session,
         ILogger<SellInvestmentCommandHandler> logger,
-        ICorrelationIdEnricher correlationIdEnricher)
+        ICorrelationIdEnricher correlationIdEnricher,
+        IMetricsRecorder metricsRecorder)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _correlationIdEnricher = correlationIdEnricher ?? throw new ArgumentNullException(nameof(correlationIdEnricher));
+        _metricsRecorder = metricsRecorder ?? throw new ArgumentNullException(nameof(metricsRecorder));
     }
 
     /// <summary>
@@ -133,6 +137,12 @@ public class SellInvestmentCommandHandler : IRequestHandler<SellInvestmentComman
             // 7. Save changes to Marten (persist events + update projections)
             // Extension method automatically adds OpenTelemetry tracing
             await _session.SaveChangesWithTracingAsync(cancellationToken);
+
+            // 8. Record business metrics using extension method
+            investmentAggregate.RecordMetrics(
+                _metricsRecorder,
+                m => m.RecordInvestmentSold(),
+                "InvestmentProjection");
 
             _logger.LogInformation(
                 "Successfully sold investment {InvestmentId}. Quantity: {QuantitySold}, P/L: {ProfitLoss} {Currency}, Complete sale: {IsComplete}", 

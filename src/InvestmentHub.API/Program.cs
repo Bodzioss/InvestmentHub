@@ -57,6 +57,9 @@ builder.Services.AddHttpContextAccessor();
 // Register Marten Correlation ID enricher
 builder.Services.AddScoped<InvestmentHub.Domain.Services.ICorrelationIdEnricher, InvestmentHub.Infrastructure.Marten.MartenCorrelationIdEnricher>();
 
+// Register metrics recorder
+builder.Services.AddScoped<InvestmentHub.Domain.Services.IMetricsRecorder, InvestmentHub.Infrastructure.Metrics.MetricsRecorder>();
+
 // Register repositories
 builder.Services.AddScoped<IInvestmentRepository, InvestmentRepository>();
 builder.Services.AddScoped<IPortfolioRepository, PortfolioRepository>();

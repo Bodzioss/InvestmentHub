@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\InvestmentHub.Domain\InvestmentHub.Domain.csproj" />
     <ProjectReference Include="..\InvestmentHub.Application\InvestmentHub.Application.csproj" />
+    <ProjectReference Include="..\..\host\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

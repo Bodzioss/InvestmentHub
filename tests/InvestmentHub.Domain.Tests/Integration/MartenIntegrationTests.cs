@@ -7,6 +7,7 @@ using InvestmentHub.Domain.Projections;
 using InvestmentHub.Domain.Queries;
 using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Domain.Services;
 using InvestmentHub.Domain.ValueObjects;
 using Marten;
 using Marten.Events;
@@ -153,6 +154,8 @@ public class MartenIntegrationTests : IAsyncLifetime
         var userRepositoryMock = new Mock<IUserRepository>();
         var portfolioRepositoryMock = new Mock<IPortfolioRepository>();
         var loggerMock = new Mock<ILogger<CreatePortfolioCommandHandler>>();
+        var correlationIdEnricherMock = new Mock<ICorrelationIdEnricher>();
+        var metricsRecorderMock = new Mock<IMetricsRecorder>();
 
         // Setup mocks for validation
         userRepositoryMock
@@ -175,7 +178,9 @@ public class MartenIntegrationTests : IAsyncLifetime
             session,
             userRepositoryMock.Object,
             portfolioRepositoryMock.Object,
-            loggerMock.Object);
+            loggerMock.Object,
+            correlationIdEnricherMock.Object,
+            metricsRecorderMock.Object);
 
         // Create command
         var portfolioId = PortfolioId.New();

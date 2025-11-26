@@ -3,6 +3,7 @@ using InvestmentHub.Domain.Handlers.Commands;
 using InvestmentHub.Domain.ValueObjects;
 using InvestmentHub.Domain.Repositories;
 using InvestmentHub.Domain.Entities;
+using InvestmentHub.Domain.Services;
 using FluentAssertions;
 using Xunit;
 using Moq;
@@ -22,6 +23,8 @@ public class CreatePortfolioCommandHandlerTests
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IPortfolioRepository> _portfolioRepositoryMock;
     private readonly Mock<ILogger<CreatePortfolioCommandHandler>> _loggerMock;
+    private readonly Mock<ICorrelationIdEnricher> _correlationIdEnricherMock;
+    private readonly Mock<IMetricsRecorder> _metricsRecorderMock;
 
     public CreatePortfolioCommandHandlerTests()
     {
@@ -29,6 +32,8 @@ public class CreatePortfolioCommandHandlerTests
         _userRepositoryMock = new Mock<IUserRepository>();
         _portfolioRepositoryMock = new Mock<IPortfolioRepository>();
         _loggerMock = new Mock<ILogger<CreatePortfolioCommandHandler>>();
+        _correlationIdEnricherMock = new Mock<ICorrelationIdEnricher>();
+        _metricsRecorderMock = new Mock<IMetricsRecorder>();
 
         // Setup default successful responses
         _userRepositoryMock
@@ -57,7 +62,9 @@ public class CreatePortfolioCommandHandlerTests
             _sessionMock.Object,
             _userRepositoryMock.Object,
             _portfolioRepositoryMock.Object,
-            _loggerMock.Object);
+            _loggerMock.Object,
+            _correlationIdEnricherMock.Object,
+            _metricsRecorderMock.Object);
     }
 
     [Fact]

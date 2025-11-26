@@ -49,6 +49,7 @@ appsettings.Local.json
 
 ## Project planning & roadmap (personal notes)
 roadmap.md
+NICE_TO_HAVE.md
 
 ## Entity Framework migrations (if not shared)
 migrations/

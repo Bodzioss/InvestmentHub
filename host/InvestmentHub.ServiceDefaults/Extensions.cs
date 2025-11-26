@@ -79,6 +79,10 @@ public static class Extensions
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
+                    // Add MediatR tracing source
+                    .AddSource("InvestmentHub.MediatR")
+                    // Add Marten tracing source
+                    .AddSource("InvestmentHub.Marten")
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>
@@ -97,10 +101,12 @@ public static class Extensions
 
     private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+        var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
 
-        if (useOtlpExporter)
+        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
         {
+            // Configure OTLP exporter for Jaeger
+            // UseOtlpExporter() automatically uses gRPC protocol when endpoint is provided
             builder.Services.AddOpenTelemetry().UseOtlpExporter();
         }
 

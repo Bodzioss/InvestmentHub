@@ -5,6 +5,8 @@ using InvestmentHub.Domain.Repositories;
 using MediatR;
 using Marten;
 using Microsoft.Extensions.Logging;
+using InvestmentHub.Domain.Services;
+using InvestmentHub.Domain.Common;
 
 namespace InvestmentHub.Domain.Handlers.Commands;
 
@@ -18,6 +20,7 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
     private readonly IUserRepository _userRepository;
     private readonly IPortfolioRepository _portfolioRepository;
     private readonly ILogger<CreatePortfolioCommandHandler> _logger;
+    private readonly ICorrelationIdEnricher _correlationIdEnricher;
 
     /// <summary>
     /// Initializes a new instance of the CreatePortfolioCommandHandler class.
@@ -26,16 +29,19 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
     /// <param name="userRepository">The user repository</param>
     /// <param name="portfolioRepository">The portfolio repository for validation</param>
     /// <param name="logger">The logger</param>
+    /// <param name="correlationIdEnricher">The Correlation ID enricher for Marten sessions</param>
     public CreatePortfolioCommandHandler(
         IDocumentSession session,
         IUserRepository userRepository,
         IPortfolioRepository portfolioRepository,
-        ILogger<CreatePortfolioCommandHandler> logger)
+        ILogger<CreatePortfolioCommandHandler> logger,
+        ICorrelationIdEnricher correlationIdEnricher)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _portfolioRepository = portfolioRepository ?? throw new ArgumentNullException(nameof(portfolioRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _correlationIdEnricher = correlationIdEnricher ?? throw new ArgumentNullException(nameof(correlationIdEnricher));
     }
 
     /// <summary>
@@ -93,14 +99,20 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
                 request.Name,
                 request.Description);
 
-            // 5. Start event stream for this portfolio and save events
+            // 5. Enrich session with Correlation ID before saving events
+            // This ensures Correlation ID is included in event metadata
+            _correlationIdEnricher.EnrichWithCorrelationId(_session);
+
+            // 6. Start event stream for this portfolio and save events
             // Marten will automatically apply the projection to create PortfolioReadModel
-            _session.Events.StartStream<PortfolioAggregate>(
+            // Extension method automatically adds OpenTelemetry tracing
+            _session.Events.StartStreamWithTracing<PortfolioAggregate>(
                 request.PortfolioId.Value,
                 portfolioAggregate.GetUncommittedEvents().ToArray());
 
-            // 6. Save changes to Marten (persist events + update projections)
-            await _session.SaveChangesAsync(cancellationToken);
+            // 7. Save changes to Marten (persist events + update projections)
+            // Extension method automatically adds OpenTelemetry tracing
+            await _session.SaveChangesWithTracingAsync(cancellationToken);
 
             _logger.LogInformation("Successfully created portfolio {PortfolioId} with {EventCount} events", 
                 request.PortfolioId.Value, portfolioAggregate.GetUncommittedEvents().Count());

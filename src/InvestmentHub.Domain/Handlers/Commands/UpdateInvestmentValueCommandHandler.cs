@@ -4,6 +4,8 @@ using InvestmentHub.Domain.ValueObjects;
 using MediatR;
 using Marten;
 using Microsoft.Extensions.Logging;
+using InvestmentHub.Domain.Services;
+using InvestmentHub.Domain.Common;
 
 namespace InvestmentHub.Domain.Handlers.Commands;
 
@@ -15,18 +17,22 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
 {
     private readonly IDocumentSession _session;
     private readonly ILogger<UpdateInvestmentValueCommandHandler> _logger;
+    private readonly ICorrelationIdEnricher _correlationIdEnricher;
 
     /// <summary>
     /// Initializes a new instance of the UpdateInvestmentValueCommandHandler class.
     /// </summary>
     /// <param name="session">The Marten document session for event sourcing</param>
     /// <param name="logger">The logger</param>
+    /// <param name="correlationIdEnricher">The Correlation ID enricher for Marten sessions</param>
     public UpdateInvestmentValueCommandHandler(
         IDocumentSession session,
-        ILogger<UpdateInvestmentValueCommandHandler> logger)
+        ILogger<UpdateInvestmentValueCommandHandler> logger,
+        ICorrelationIdEnricher correlationIdEnricher)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _correlationIdEnricher = correlationIdEnricher ?? throw new ArgumentNullException(nameof(correlationIdEnricher));
     }
 
     /// <summary>
@@ -46,9 +52,10 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
             cancellationToken.ThrowIfCancellationRequested();
 
             // 1. Load events from the investment stream
-            var events = await _session.Events.FetchStreamAsync(request.InvestmentId.Value, token: cancellationToken);
+            // Extension method automatically adds OpenTelemetry tracing
+            var events = await _session.Events.FetchStreamWithTracingAsync(request.InvestmentId.Value, cancellationToken);
             
-            if (events == null || !events.Any())
+            if (!events.Any())
             {
                 _logger.LogWarning("Investment {InvestmentId} not found in event stream", request.InvestmentId.Value);
                 return UpdateInvestmentValueResult.Failure("Investment not found");
@@ -66,13 +73,19 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
             // CurrentPrice is per unit, so we pass it directly
             investmentAggregate.UpdateValue(request.CurrentPrice);
 
-            // 4. Append new events to the stream
-            _session.Events.Append(
+            // 4. Enrich session with Correlation ID before saving events
+            // This ensures Correlation ID is included in event metadata
+            _correlationIdEnricher.EnrichWithCorrelationId(_session);
+
+            // 5. Append new events to the stream
+            // Extension method automatically adds OpenTelemetry tracing
+            _session.Events.AppendWithTracing(
                 request.InvestmentId.Value,
                 investmentAggregate.GetUncommittedEvents().ToArray());
 
-            // 5. Save changes to Marten (persist events + update projections)
-            await _session.SaveChangesAsync(cancellationToken);
+            // 6. Save changes to Marten (persist events + update projections)
+            // Extension method automatically adds OpenTelemetry tracing
+            await _session.SaveChangesWithTracingAsync(cancellationToken);
 
             _logger.LogInformation("Successfully updated investment {InvestmentId}. New total value: {CurrentValue} {Currency}", 
                 request.InvestmentId.Value, investmentAggregate.CurrentValue.Amount, investmentAggregate.CurrentValue.Currency);

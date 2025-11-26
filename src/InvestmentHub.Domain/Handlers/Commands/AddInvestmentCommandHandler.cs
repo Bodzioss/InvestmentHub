@@ -6,6 +6,8 @@ using InvestmentHub.Domain.ReadModels;
 using MediatR;
 using Marten;
 using Microsoft.Extensions.Logging;
+using InvestmentHub.Domain.Services;
+using InvestmentHub.Domain.Common;
 
 namespace InvestmentHub.Domain.Handlers.Commands;
 
@@ -17,18 +19,22 @@ public class AddInvestmentCommandHandler : IRequestHandler<AddInvestmentCommand,
 {
     private readonly IDocumentSession _session;
     private readonly ILogger<AddInvestmentCommandHandler> _logger;
+    private readonly ICorrelationIdEnricher _correlationIdEnricher;
 
     /// <summary>
     /// Initializes a new instance of the AddInvestmentCommandHandler class.
     /// </summary>
     /// <param name="session">The Marten document session for event sourcing</param>
     /// <param name="logger">The logger</param>
+    /// <param name="correlationIdEnricher">The Correlation ID enricher for Marten sessions</param>
     public AddInvestmentCommandHandler(
         IDocumentSession session,
-        ILogger<AddInvestmentCommandHandler> logger)
+        ILogger<AddInvestmentCommandHandler> logger,
+        ICorrelationIdEnricher correlationIdEnricher)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _correlationIdEnricher = correlationIdEnricher ?? throw new ArgumentNullException(nameof(correlationIdEnricher));
     }
 
     /// <summary>
@@ -115,14 +121,20 @@ public class AddInvestmentCommandHandler : IRequestHandler<AddInvestmentCommand,
                 request.Quantity,
                 request.PurchaseDate);
 
-            // 6. Start event stream for this investment and save events
+            // 6. Enrich session with Correlation ID before saving events
+            // This ensures Correlation ID is included in event metadata
+            _correlationIdEnricher.EnrichWithCorrelationId(_session);
+
+            // 7. Start event stream for this investment and save events
             // Marten will automatically apply the InvestmentProjection to create InvestmentReadModel
-            _session.Events.StartStream<InvestmentAggregate>(
+            // Extension method automatically adds OpenTelemetry tracing
+            _session.Events.StartStreamWithTracing<InvestmentAggregate>(
                 investmentId.Value,
                 investmentAggregate.GetUncommittedEvents().ToArray());
 
-            // 7. Save changes to Marten (persist events + update projections)
-            await _session.SaveChangesAsync(cancellationToken);
+            // 8. Save changes to Marten (persist events + update projections)
+            // Extension method automatically adds OpenTelemetry tracing
+            await _session.SaveChangesWithTracingAsync(cancellationToken);
 
             _logger.LogInformation("Successfully added investment {InvestmentId} to portfolio {PortfolioId} with {EventCount} events", 
                 investmentId.Value, request.PortfolioId.Value, investmentAggregate.GetUncommittedEvents().Count());

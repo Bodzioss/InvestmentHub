@@ -15,6 +15,7 @@ using InvestmentHub.API.Mapping;
 using Marten;
 using Marten.Events;
 using InvestmentHub.Domain.Projections;
+using InvestmentHub.API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +36,10 @@ builder.Services.AddMarten(options =>
     // Use Guid as stream identity (recommended for new projects)
     options.Events.StreamIdentity = StreamIdentity.AsGuid;
     
+    // Enable Correlation ID in event metadata
+    // This allows Marten to store Correlation ID with each event
+    options.Events.MetadataConfig.CorrelationIdEnabled = true;
+    
     // Register projections
     options.Projections.Add<PortfolioProjection>(Marten.Events.Projections.ProjectionLifecycle.Inline);
     options.Projections.Add<InvestmentProjection>(Marten.Events.Projections.ProjectionLifecycle.Inline);
@@ -45,6 +50,12 @@ builder.Services.AddMarten(options =>
         options.AutoCreateSchemaObjects = Weasel.Core.AutoCreate.All;
     }
 });
+
+// Register HTTP context accessor for Correlation ID enrichment
+builder.Services.AddHttpContextAccessor();
+
+// Register Marten Correlation ID enricher
+builder.Services.AddScoped<InvestmentHub.Domain.Services.ICorrelationIdEnricher, InvestmentHub.Infrastructure.Marten.MartenCorrelationIdEnricher>();
 
 // Register repositories
 builder.Services.AddScoped<IInvestmentRepository, InvestmentRepository>();
@@ -130,7 +141,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Add middleware
+// Add Correlation ID middleware first (before other middleware)
+// This ensures Correlation ID is available in all subsequent logs
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Add other middleware
 app.UseCors("AllowAll");
 app.UseResponseCompression();
 

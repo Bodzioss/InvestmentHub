@@ -15,12 +15,20 @@ var seq = builder.AddContainer("seq", "datalust/seq")
     .WithEnvironment("SEQ_FIRSTRUN_NOAUTHENTICATION", "true")
     .WithVolume("seq-data", "/data");
 
+// Add Jaeger for distributed tracing
+var jaeger = builder.AddContainer("jaeger", "jaegertracing/all-in-one:latest")
+    .WithHttpEndpoint(targetPort: 16686, port: 16686, name: "jaeger-ui")
+    .WithHttpEndpoint(targetPort: 4317, port: 4317, name: "jaeger-otlp-grpc")
+    .WithHttpEndpoint(targetPort: 4318, port: 4318, name: "jaeger-otlp-http")
+    .WithEnvironment("COLLECTOR_OTLP_ENABLED", "true");
+
 // Add API service
 var api = builder.AddProject<Projects.InvestmentHub_API>("api")
     .WithReference(postgres)
     .WithReference(redis)
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "https")
-    .WithEnvironment("Seq__ServerUrl", seq.GetEndpoint("seq"));
+    .WithEnvironment("Seq__ServerUrl", seq.GetEndpoint("seq"))
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"));
 
 // Add Web Client (Blazor WASM)
 var webClient = builder.AddProject<Projects.InvestmentHub_Web_Client>("webclient")
@@ -33,6 +41,7 @@ var workers = builder.AddProject<Projects.InvestmentHub_Workers>("workers")
     .WithReference(postgres)
     .WithReference(redis)
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "Workers")
-    .WithEnvironment("Seq__ServerUrl", seq.GetEndpoint("seq"));
+    .WithEnvironment("Seq__ServerUrl", seq.GetEndpoint("seq"))
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"));
 
 builder.Build().Run();

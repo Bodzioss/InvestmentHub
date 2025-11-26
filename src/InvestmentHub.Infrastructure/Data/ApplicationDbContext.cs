@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using InvestmentHub.Domain.Entities;
-using InvestmentHub.Domain.Repositories;
 using InvestmentHub.Domain.ValueObjects;
-using InvestmentHub.Domain.Enums;
 
 namespace InvestmentHub.Infrastructure.Data;
 

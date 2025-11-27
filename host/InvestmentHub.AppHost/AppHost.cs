@@ -22,6 +22,14 @@ var jaeger = builder.AddContainer("jaeger", "jaegertracing/all-in-one:latest")
     .WithHttpEndpoint(targetPort: 4318, port: 4318, name: "jaeger-otlp-http")
     .WithEnvironment("COLLECTOR_OTLP_ENABLED", "true");
 
+// Add RabbitMQ for messaging
+var rabbitmq = builder.AddContainer("rabbitmq", "rabbitmq:3-management-alpine")
+    .WithHttpEndpoint(targetPort: 15672, port: 15672, name: "rabbitmq-management")
+    .WithEndpoint(5672, 5672, name: "rabbitmq-amqp", scheme: "amqp")
+    .WithEnvironment("RABBITMQ_DEFAULT_USER", "guest")
+    .WithEnvironment("RABBITMQ_DEFAULT_PASS", "guest")
+    .WithVolume("rabbitmq-data", "/var/lib/rabbitmq");
+
 // Add API service
 var api = builder.AddProject<Projects.InvestmentHub_API>("api")
     .WithReference(postgres)
@@ -32,7 +40,9 @@ var api = builder.AddProject<Projects.InvestmentHub_API>("api")
     // - In Aspire, metrics are automatically exported to Aspire Dashboard
     // - Traces are exported to Jaeger via code configuration (see Extensions.cs)
     // Setting OTEL_EXPORTER_OTLP_ENDPOINT would redirect metrics to Jaeger instead of Dashboard
-    .WithEnvironment("JAEGER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"));
+    .WithEnvironment("JAEGER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"))
+    // RabbitMQ connection string - using GetEndpoint which Aspire will resolve at runtime
+    .WithEnvironment("RabbitMQ__ConnectionString", rabbitmq.GetEndpoint("rabbitmq-amqp"));
 
 // Add Web Client (Blazor WASM)
 var webClient = builder.AddProject<Projects.InvestmentHub_Web_Client>("webclient")
@@ -47,6 +57,8 @@ var workers = builder.AddProject<Projects.InvestmentHub_Workers>("workers")
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "Workers")
     .WithEnvironment("Seq__ServerUrl", seq.GetEndpoint("seq"))
     // Note: We don't set OTEL_EXPORTER_OTLP_ENDPOINT here (see API service comment above)
-    .WithEnvironment("JAEGER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"));
+    .WithEnvironment("JAEGER_OTLP_ENDPOINT", jaeger.GetEndpoint("jaeger-otlp-grpc"))
+    // RabbitMQ connection string - using GetEndpoint which Aspire will resolve at runtime
+    .WithEnvironment("RabbitMQ__ConnectionString", rabbitmq.GetEndpoint("rabbitmq-amqp"));
 
 builder.Build().Run();

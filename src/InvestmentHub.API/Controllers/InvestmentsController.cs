@@ -41,23 +41,15 @@ public class InvestmentsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> AddInvestment([FromBody] AddInvestmentRequest request)
     {
-        try
-        {
-            var command = _mapper.Map<AddInvestmentCommand>(request);
-            var result = await _mediator.Send(command);
+        var command = _mapper.Map<AddInvestmentCommand>(request);
+        var result = await _mediator.Send(command);
 
-            if (result.IsSuccess)
-            {
-                return Ok(new { InvestmentId = result.InvestmentId.Value });
-            }
-
-            return BadRequest(new { Error = result.ErrorMessage });
-        }
-        catch (Exception ex)
+        if (result.IsSuccess)
         {
-            _logger.LogError(ex, "Error adding investment");
-            return StatusCode(500, new { Error = "Internal server error" });
+            return Ok(new { InvestmentId = result.InvestmentId.Value });
         }
+
+        return BadRequest(new { Error = result.ErrorMessage });
     }
 
     /// <summary>
@@ -68,23 +60,15 @@ public class InvestmentsController : ControllerBase
     [HttpPut("value")]
     public async Task<IActionResult> UpdateInvestmentValue([FromBody] UpdateInvestmentValueRequest request)
     {
-        try
-        {
-            var command = _mapper.Map<UpdateInvestmentValueCommand>(request);
-            var result = await _mediator.Send(command);
+        var command = _mapper.Map<UpdateInvestmentValueCommand>(request);
+        var result = await _mediator.Send(command);
 
-            if (result.IsSuccess)
-            {
-                return Ok(new { UpdatedValue = result.UpdatedValue!.Amount });
-            }
-
-            return BadRequest(new { Error = result.ErrorMessage });
-        }
-        catch (Exception ex)
+        if (result.IsSuccess)
         {
-            _logger.LogError(ex, "Error updating investment value");
-            return StatusCode(500, new { Error = "Internal server error" });
+            return Ok(new { UpdatedValue = result.UpdatedValue!.Amount });
         }
+
+        return BadRequest(new { Error = result.ErrorMessage });
     }
 
     /// <summary>
@@ -95,29 +79,21 @@ public class InvestmentsController : ControllerBase
     [HttpPost("sell")]
     public async Task<IActionResult> SellInvestment([FromBody] SellInvestmentRequest request)
     {
-        try
-        {
-            var command = _mapper.Map<SellInvestmentCommand>(request);
-            var result = await _mediator.Send(command);
+        var command = _mapper.Map<SellInvestmentCommand>(request);
+        var result = await _mediator.Send(command);
 
-            if (result.IsSuccess)
+        if (result.IsSuccess)
+        {
+            return Ok(new
             {
-                return Ok(new
-                {
-                    RealizedProfitLoss = result.RealizedProfitLoss!.Amount,
-                    Currency = result.RealizedProfitLoss!.Currency.ToString(),
-                    QuantitySold = result.QuantitySold,
-                    IsCompleteSale = result.IsCompleteSale
-                });
-            }
+                RealizedProfitLoss = result.RealizedProfitLoss!.Amount,
+                Currency = result.RealizedProfitLoss!.Currency.ToString(),
+                QuantitySold = result.QuantitySold,
+                IsCompleteSale = result.IsCompleteSale
+            });
+        }
 
-            return BadRequest(new { Error = result.ErrorMessage });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error selling investment");
-            return StatusCode(500, new { Error = "Internal server error" });
-        }
+        return BadRequest(new { Error = result.ErrorMessage });
     }
 
     /// <summary>
@@ -128,29 +104,21 @@ public class InvestmentsController : ControllerBase
     [HttpGet("portfolio/{portfolioId}")]
     public async Task<IActionResult> GetInvestmentsByPortfolio([FromRoute] string portfolioId)
     {
-        try
-        {
-            var query = new GetInvestmentsQuery(PortfolioId.FromString(portfolioId));
-            var result = await _mediator.Send(query);
+        var query = new GetInvestmentsQuery(PortfolioId.FromString(portfolioId));
+        var result = await _mediator.Send(query);
 
-            if (result.IsSuccess && result.Investments != null)
+        if (result.IsSuccess && result.Investments != null)
+        {
+            var response = result.Investments.Select(inv =>
             {
-                var response = result.Investments.Select(inv =>
-                {
-                    var dto = _mapper.Map<InvestmentResponseDto>(inv);
-                    dto.PortfolioId = portfolioId; // Set portfolioId from route parameter
-                    return dto;
-                }).ToList();
-                return Ok(response);
-            }
+                var dto = _mapper.Map<InvestmentResponseDto>(inv);
+                dto.PortfolioId = portfolioId; // Set portfolioId from route parameter
+                return dto;
+            }).ToList();
+            return Ok(response);
+        }
 
-            return BadRequest(new { Error = result.ErrorMessage });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving investments for portfolio {PortfolioId}", portfolioId);
-            return StatusCode(500, new { Error = "Internal server error" });
-        }
+        return BadRequest(new { Error = result.ErrorMessage });
     }
 
     /// <summary>
@@ -161,29 +129,16 @@ public class InvestmentsController : ControllerBase
     [HttpGet("{investmentId}")]
     public async Task<IActionResult> GetInvestment([FromRoute] string investmentId)
     {
-        try
-        {
-            var query = new GetInvestmentQuery(InvestmentId.FromString(investmentId));
-            var result = await _mediator.Send(query);
+        var query = new GetInvestmentQuery(InvestmentId.FromString(investmentId));
+        var result = await _mediator.Send(query);
 
-            if (result.IsSuccess && result.Investment != null)
-            {
-                var response = _mapper.Map<InvestmentResponseDto>(result.Investment);
-                return Ok(response);
-            }
+        if (result.IsSuccess && result.Investment != null)
+        {
+            var response = _mapper.Map<InvestmentResponseDto>(result.Investment);
+            return Ok(response);
+        }
 
-            return NotFound(new { Error = "Investment not found" });
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogError(ex, "Invalid investment ID format: {InvestmentId}", investmentId);
-            return BadRequest(new { Error = "Invalid investment ID format" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving investment");
-            return StatusCode(500, new { Error = "Internal server error" });
-        }
+        return NotFound(new { Error = "Investment not found" });
     }
 
     // ==================== Event Sourcing Incompatible Endpoints ====================

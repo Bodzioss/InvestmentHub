@@ -395,7 +395,8 @@ public class InvestmentTests
         // Assert
         result.Should().Contain("AAPL");
         result.Should().Contain("10 units");
-        result.Should().Contain("150,00 USD"); // Polish locale uses comma as decimal separator
+        // Format depends on system culture - accept both comma and dot as decimal separator
+        result.Should().MatchRegex(@"150[.,]00.*USD");
         result.Should().Contain("Active");
     }
 }

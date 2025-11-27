@@ -16,6 +16,7 @@ using Marten;
 using Marten.Events;
 using InvestmentHub.Domain.Projections;
 using InvestmentHub.API.Middleware;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -112,6 +113,31 @@ builder.Services.AddMediatR(cfg =>
     cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 });
 
+// Add MassTransit for messaging
+var rabbitMqConnectionString = builder.Configuration["RabbitMQ:ConnectionString"] 
+    ?? "amqp://guest:guest@localhost:5672/";
+
+// If Aspire endpoint doesn't include credentials, add them
+if (!rabbitMqConnectionString.Contains("@") && rabbitMqConnectionString.StartsWith("amqp://"))
+{
+    rabbitMqConnectionString = rabbitMqConnectionString.Replace("amqp://", "amqp://guest:guest@");
+}
+
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        // Simple configuration - MassTransit will parse the connection string
+        cfg.Host(rabbitMqConnectionString);
+        
+        // Configure endpoints (consumers will be added in later steps)
+        cfg.ConfigureEndpoints(context);
+    });
+});
+
+// Note: MassTransit hosted service is automatically registered in MassTransit 8.x
+// No need to call AddMassTransitHostedService() - it's obsolete
+
 var app = builder.Build();
 
 // Log Seq configuration status
@@ -125,6 +151,18 @@ if (!string.IsNullOrEmpty(seqUrl))
 else
 {
     logger.LogWarning("Seq logging is not configured. Set 'Seq:ServerUrl' in configuration to enable Seq.");
+}
+
+// Log RabbitMQ configuration status
+var rabbitMqUrl = app.Configuration["RabbitMQ:ConnectionString"];
+if (!string.IsNullOrEmpty(rabbitMqUrl))
+{
+    logger.LogInformation("RabbitMQ messaging configured and enabled. RabbitMQ Connection: {RabbitMqUrl}", rabbitMqUrl);
+    logger.LogInformation("MassTransit is active. RabbitMQ Management UI available at http://localhost:15672 (guest/guest)");
+}
+else
+{
+    logger.LogWarning("RabbitMQ messaging is not configured. Set 'RabbitMQ:ConnectionString' in configuration to enable messaging.");
 }
 
 // Ensure database is created and seeded
@@ -152,34 +190,12 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseCors("AllowAll");
 app.UseResponseCompression();
 
+// Add global exception handler before mapping endpoints
+// This catches all exceptions from controllers and other middleware
+app.UseMiddleware<GlobalExceptionHandler>();
+
 // Map default endpoints (health checks)
 app.MapDefaultEndpoints();
 
 // Map controllers
 app.MapControllers();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

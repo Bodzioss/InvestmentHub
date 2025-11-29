@@ -35,8 +35,8 @@ public interface IInvestmentsApi
     /// <summary>
     /// Sell investment
     /// </summary>
-    [Post("/api/investments/{id}/sell")]
-    Task<InvestmentResponseDto> SellInvestmentAsync(string id, [Body] SellInvestmentRequest request);
+    [Post("/api/investments/sell")]
+    Task<InvestmentResponseDto> SellInvestmentAsync([Body] SellInvestmentRequest request);
 
     /// <summary>
     /// Delete investment

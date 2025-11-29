@@ -43,7 +43,7 @@ public class PortfolioProjectionTests
         readModel.Currency.Should().Be("USD");
         readModel.InvestmentCount.Should().Be(0);
         readModel.LastUpdated.Should().Be(@event.OccurredOn);
-        readModel.Version.Should().Be(@event.Version);
+        readModel.AggregateVersion.Should().Be(@event.Version);
     }
 
     [Fact]
@@ -86,35 +86,7 @@ public class PortfolioProjectionTests
         // Assert
         readModel.Name.Should().Be(newName);
         readModel.LastUpdated.Should().Be(renamedEvent.OccurredOn);
-        readModel.Version.Should().Be(renamedEvent.Version);
-    }
-
-    [Fact]
-    public void Apply_ShouldMarkPortfolioAsClosedWhenPortfolioClosed()
-    {
-        // Arrange
-        var portfolioId = PortfolioId.New();
-        var ownerId = UserId.New();
-        var name = "Test Portfolio";
-        var createdAt = DateTime.UtcNow;
-
-        var createdEvent = new PortfolioCreatedEvent(portfolioId, ownerId, name, "Desc", createdAt);
-        var readModel = _projection.Create(createdEvent);
-
-        var closedBy = UserId.New();
-        var reason = "User request";
-        var closedAt = DateTime.UtcNow.AddDays(1);
-        var closedEvent = new PortfolioClosedEvent(portfolioId, name, reason, closedAt, closedBy);
-
-        // Act
-        _projection.Apply(readModel, closedEvent);
-
-        // Assert
-        readModel.IsClosed.Should().BeTrue();
-        readModel.ClosedAt.Should().Be(closedAt);
-        readModel.CloseReason.Should().Be(reason);
-        readModel.LastUpdated.Should().Be(closedEvent.OccurredOn);
-        readModel.Version.Should().Be(closedEvent.Version);
+        readModel.AggregateVersion.Should().Be(renamedEvent.Version);
     }
 
     [Fact]
@@ -171,7 +143,7 @@ public class PortfolioProjectionTests
         readModel.IsClosed.Should().BeTrue();
         readModel.ClosedAt.Should().Be(closedEvent.ClosedAt);
         readModel.CloseReason.Should().Be("Closing");
-        readModel.Version.Should().Be(1); // Each event sets its own version
+        readModel.AggregateVersion.Should().Be(1); // Each event sets its own version
         readModel.LastUpdated.Should().Be(closedEvent.OccurredOn);
     }
 

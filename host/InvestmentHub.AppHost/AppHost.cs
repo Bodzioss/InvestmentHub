@@ -23,11 +23,13 @@ var jaeger = builder.AddContainer("jaeger", "jaegertracing/all-in-one:latest")
     .WithEnvironment("COLLECTOR_OTLP_ENABLED", "true");
 
 // Add RabbitMQ for messaging
-var rabbitmq = builder.AddContainer("rabbitmq", "rabbitmq:3-management-alpine")
+// Using latest stable version to avoid JavaScript errors in Management UI
+var rabbitmq = builder.AddContainer("rabbitmq", "rabbitmq:3.13-management")
     .WithHttpEndpoint(targetPort: 15672, port: 15672, name: "rabbitmq-management")
     .WithEndpoint(5672, 5672, name: "rabbitmq-amqp", scheme: "amqp")
     .WithEnvironment("RABBITMQ_DEFAULT_USER", "guest")
     .WithEnvironment("RABBITMQ_DEFAULT_PASS", "guest")
+    .WithEnvironment("RABBITMQ_DEFAULT_VHOST", "/")
     .WithVolume("rabbitmq-data", "/var/lib/rabbitmq");
 
 // Add API service

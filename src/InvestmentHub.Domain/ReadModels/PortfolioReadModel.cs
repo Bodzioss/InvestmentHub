@@ -77,6 +77,6 @@ public class PortfolioReadModel
     /// Gets or sets the version of the aggregate.
     /// Used for optimistic concurrency and tracking event replay progress.
     /// </summary>
-    public int Version { get; set; }
+    public int AggregateVersion { get; set; }
 }
 

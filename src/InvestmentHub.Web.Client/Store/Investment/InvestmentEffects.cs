@@ -111,7 +111,7 @@ public class InvestmentEffects
             _logger.LogInformation("Selling investment {InvestmentId}", action.InvestmentId);
 
             var updatedInvestment = await ApiErrorHandler.HandleApiCall(
-                () => _investmentsApi.SellInvestmentAsync(action.InvestmentId, action.Request)
+                () => _investmentsApi.SellInvestmentAsync(action.Request)
             );
 
             // Reload investments after selling

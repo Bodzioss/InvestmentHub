@@ -82,7 +82,9 @@ public static class Extensions
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
                     // Add custom InvestmentHub metrics
-                    .AddMeter(InvestmentHubMetrics.MeterName);
+                    .AddMeter(InvestmentHubMetrics.MeterName)
+                    // Add MassTransit metrics
+                    .AddMeter("MassTransit");
                 
                 // Export metrics to Aspire Dashboard (required for metrics to be visible)
                 if (isRunningInAspire && !string.IsNullOrWhiteSpace(aspireDashboardEndpoint))
@@ -100,6 +102,8 @@ public static class Extensions
                     .AddSource("InvestmentHub.MediatR")
                     // Add Marten tracing source
                     .AddSource("InvestmentHub.Marten")
+                    // Add MassTransit tracing source
+                    .AddSource("MassTransit")
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>
@@ -297,7 +301,7 @@ public static class Extensions
         }
 
         // Add response compression
-        builder.Services.AddResponseCompression();
+        // builder.Services.AddResponseCompression();
 
         // Add CORS
         builder.Services.AddCors(options =>

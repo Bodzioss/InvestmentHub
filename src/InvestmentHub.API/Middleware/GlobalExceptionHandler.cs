@@ -1,97 +1,86 @@
 using FluentValidation;
-using System.Net;
-using System.Text.Json;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 
 namespace InvestmentHub.API.Middleware;
 
 /// <summary>
-/// Global exception handler middleware that catches exceptions and returns appropriate HTTP responses.
-/// This ensures that validation errors and other exceptions are properly returned to the client.
+/// Global exception handler that catches exceptions and converts them to ProblemDetails responses.
 /// </summary>
-public class GlobalExceptionHandler
+public class GlobalExceptionHandler : IExceptionHandler
 {
-    private readonly RequestDelegate _next;
     private readonly ILogger<GlobalExceptionHandler> _logger;
 
-    public GlobalExceptionHandler(RequestDelegate next, ILogger<GlobalExceptionHandler> logger)
+    public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
     {
-        _next = next;
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext httpContext,
+        Exception exception,
+        CancellationToken cancellationToken)
     {
-        try
-        {
-            await _next(context);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "An unhandled exception occurred: {Message}", ex.Message);
-            await HandleExceptionAsync(context, ex);
-        }
-    }
+        _logger.LogError(exception, "An unhandled exception occurred: {Message}", exception.Message);
 
-    private static Task HandleExceptionAsync(HttpContext context, Exception exception)
-    {
-        var code = HttpStatusCode.InternalServerError;
-        var message = "An error occurred while processing your request.";
-        var errors = new List<string>();
+        var problemDetails = new ProblemDetails
+        {
+            Instance = httpContext.Request.Path
+        };
 
         switch (exception)
         {
             case ValidationException validationException:
-                code = HttpStatusCode.BadRequest;
-                message = "Validation failed";
-                errors = validationException.Errors
-                    .Select(e => e.ErrorMessage)
+                problemDetails.Title = "Validation failed";
+                problemDetails.Status = StatusCodes.Status400BadRequest;
+                problemDetails.Detail = "One or more validation errors occurred.";
+                problemDetails.Extensions["errors"] = validationException.Errors
+                    .Select(e => new { Field = e.PropertyName, Error = e.ErrorMessage })
                     .ToList();
                 break;
 
-            // ArgumentNullException must come before ArgumentException
-            // because ArgumentNullException inherits from ArgumentException
             case ArgumentNullException argumentNullException:
-                code = HttpStatusCode.BadRequest;
-                message = argumentNullException.Message;
+                problemDetails.Title = "Invalid Argument";
+                problemDetails.Status = StatusCodes.Status400BadRequest;
+                problemDetails.Detail = argumentNullException.Message;
                 break;
 
             case ArgumentException argumentException:
-                code = HttpStatusCode.BadRequest;
-                message = argumentException.Message;
+                problemDetails.Title = "Invalid Argument";
+                problemDetails.Status = StatusCodes.Status400BadRequest;
+                problemDetails.Detail = argumentException.Message;
                 break;
 
             case InvalidOperationException invalidOperationException:
-                code = HttpStatusCode.BadRequest;
-                message = invalidOperationException.Message;
+                problemDetails.Title = "Invalid Operation";
+                problemDetails.Status = StatusCodes.Status400BadRequest;
+                problemDetails.Detail = invalidOperationException.Message;
                 break;
 
             case KeyNotFoundException:
-                code = HttpStatusCode.NotFound;
-                message = "The requested resource was not found.";
+                problemDetails.Title = "Resource Not Found";
+                problemDetails.Status = StatusCodes.Status404NotFound;
+                problemDetails.Detail = "The requested resource was not found.";
                 break;
 
             case UnauthorizedAccessException:
-                code = HttpStatusCode.Unauthorized;
-                message = "You are not authorized to perform this action.";
+                problemDetails.Title = "Unauthorized";
+                problemDetails.Status = StatusCodes.Status401Unauthorized;
+                problemDetails.Detail = "You are not authorized to perform this action.";
+                break;
+
+            default:
+                problemDetails.Title = "An error occurred";
+                problemDetails.Status = StatusCodes.Status500InternalServerError;
+                problemDetails.Detail = "An unexpected error occurred while processing your request.";
                 break;
         }
 
-        var response = new
-        {
-            error = message,
-            errors = errors.Any() ? errors : null,
-            statusCode = (int)code
-        };
+        httpContext.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
 
-        context.Response.ContentType = "application/json";
-        context.Response.StatusCode = (int)code;
+        await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
 
-        var jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-
-        return context.Response.WriteAsync(JsonSerializer.Serialize(response, jsonOptions));
+        return true;
     }
 }
 

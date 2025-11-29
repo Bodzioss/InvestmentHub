@@ -71,7 +71,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
                 requestName,
                 string.Join(", ", errors));
 
-            throw new ValidationException($"Validation failed: {string.Join(", ", errors)}");
+            throw new ValidationException(validationFailures);
         }
 
         _logger.LogDebug(

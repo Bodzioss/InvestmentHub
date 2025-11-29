@@ -2,6 +2,7 @@
 @using InvestmentHub.Web.Client.Store.Investment
 @using InvestmentHub.Web.Client.Services
 @using Fluxor
+@using System.Text.Json
 
 <MudDialog>
     <TitleContent>
@@ -136,6 +137,9 @@
     [Inject]
     private ISnackbar Snackbar { get; set; } = null!;
 
+    [Inject]
+    private IInvestmentsApi InvestmentsApi { get; set; } = null!;
+
     private MudForm _form = null!;
     private bool _isValid;
     private bool _isSubmitting;
@@ -183,10 +187,56 @@
                 PurchaseDate = _purchaseDate.Value
             };
 
-            Dispatcher.Dispatch(new AddInvestmentAction(request));
+            // Call API directly to handle errors locally
+            await ApiErrorHandler.HandleApiCall(
+                () => InvestmentsApi.AddInvestmentAsync(request)
+            );
+
+            // Reload investments after adding
+            Dispatcher.Dispatch(new LoadInvestmentsAction(PortfolioId));
 
             Snackbar.Add($"Investment in {_ticker} added successfully!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (InvestmentHubApiException ex)
+        {
+            var errorMessage = "Failed to add investment";
+            
+            // Try to parse validation errors from response content
+            if (!string.IsNullOrEmpty(ex.ResponseContent))
+            {
+                try 
+                {
+                    using var doc = JsonDocument.Parse(ex.ResponseContent);
+                    if (doc.RootElement.TryGetProperty("errors", out var errorsElement) && errorsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        var errors = errorsElement.EnumerateArray()
+                            .Select(e => e.GetString())
+                            .Where(s => !string.IsNullOrEmpty(s))
+                            .ToList();
+                            
+                        if (errors.Any())
+                        {
+                            errorMessage = string.Join("\n", errors);
+                        }
+                    }
+                    else if (doc.RootElement.TryGetProperty("error", out var errorElement))
+                    {
+                         errorMessage = errorElement.GetString() ?? errorMessage;
+                    }
+                }
+                catch
+                {
+                    // Fallback to exception message if parsing fails
+                    errorMessage = ex.Message;
+                }
+            }
+            else
+            {
+                errorMessage = ex.Message;
+            }
+
+            Snackbar.Add(errorMessage, Severity.Error);
         }
         catch (Exception ex)
         {

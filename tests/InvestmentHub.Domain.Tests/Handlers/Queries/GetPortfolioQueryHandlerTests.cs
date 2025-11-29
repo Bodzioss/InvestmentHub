@@ -49,7 +49,7 @@ public class GetPortfolioQueryHandlerTests
             Currency = "USD",
             InvestmentCount = 5,
             LastUpdated = DateTime.UtcNow,
-            Version = 1
+            AggregateVersion = 1
         };
 
         _sessionMock
@@ -123,7 +123,7 @@ public class GetPortfolioQueryHandlerTests
             Currency = "USD",
             InvestmentCount = 0,
             LastUpdated = DateTime.UtcNow.AddDays(-1),
-            Version = 3
+            AggregateVersion = 3
         };
 
         _sessionMock
@@ -201,7 +201,7 @@ public class GetPortfolioQueryHandlerTests
             Currency = "USD",
             InvestmentCount = 10,
             LastUpdated = DateTime.UtcNow,
-            Version = 7 // This portfolio has been modified 7 times
+            AggregateVersion = 7 // This portfolio has been modified 7 times
         };
 
         _sessionMock
@@ -217,7 +217,7 @@ public class GetPortfolioQueryHandlerTests
         result.Should().NotBeNull();
         result.IsSuccess.Should().BeTrue();
         result.Portfolio.Should().NotBeNull();
-        result.Portfolio!.Version.Should().Be(7);
+        result.Portfolio!.AggregateVersion.Should().Be(7);
     }
 
     [Fact]
@@ -239,7 +239,7 @@ public class GetPortfolioQueryHandlerTests
             Currency = "USD",
             InvestmentCount = 2,
             LastUpdated = DateTime.UtcNow,
-            Version = 1
+            AggregateVersion = 1
         };
 
         _sessionMock

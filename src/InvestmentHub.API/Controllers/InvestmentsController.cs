@@ -71,14 +71,18 @@ public class InvestmentsController : ControllerBase
         return BadRequest(new { Error = result.ErrorMessage });
     }
 
-    /// <summary>
-    /// Sells an investment (fully or partially).
-    /// </summary>
-    /// <param name="request">The sell investment request</param>
-    /// <returns>The result of the operation</returns>
     [HttpPost("sell")]
     public async Task<IActionResult> SellInvestment([FromBody] SellInvestmentRequest request)
     {
+        // DEBUG: Log incoming request
+        _logger.LogInformation("SellInvestment called with InvestmentId={InvestmentId}, SalePrice={SalePrice}, Currency={Currency}", 
+            request.InvestmentId, request.SalePrice?.Amount, request.SalePrice?.Currency);
+
+        if (string.IsNullOrEmpty(request.InvestmentId))
+        {
+            return BadRequest(new { Error = "InvestmentId is required" });
+        }
+
         var command = _mapper.Map<SellInvestmentCommand>(request);
         var result = await _mediator.Send(command);
 
@@ -126,7 +130,7 @@ public class InvestmentsController : ControllerBase
     /// </summary>
     /// <param name="investmentId">The investment ID</param>
     /// <returns>The investment data</returns>
-    [HttpGet("{investmentId}")]
+    [HttpGet("{investmentId:guid}")]
     public async Task<IActionResult> GetInvestment([FromRoute] string investmentId)
     {
         var query = new GetInvestmentQuery(InvestmentId.FromString(investmentId));

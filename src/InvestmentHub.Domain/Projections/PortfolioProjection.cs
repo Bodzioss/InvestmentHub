@@ -51,7 +51,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
             Currency = "USD",
             InvestmentCount = 0,
             LastUpdated = @event.OccurredOn,
-            Version = @event.Version
+            AggregateVersion = @event.Version
         };
     }
 
@@ -64,7 +64,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
     {
         model.Name = @event.NewName;
         model.LastUpdated = @event.OccurredOn;
-        model.Version = @event.Version;
+        model.AggregateVersion = @event.Version;
     }
 
     /// <summary>
@@ -78,7 +78,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
         model.ClosedAt = @event.ClosedAt;
         model.CloseReason = @event.Reason;
         model.LastUpdated = @event.OccurredOn;
-        model.Version = @event.Version;
+        model.AggregateVersion = @event.Version;
     }
 
     // ==================== Cross-Stream Investment Events ====================
@@ -150,4 +150,3 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
         model.LastUpdated = @event.OccurredOn;
     }
 }
-

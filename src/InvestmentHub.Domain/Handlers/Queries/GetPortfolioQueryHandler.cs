@@ -55,7 +55,7 @@ public class GetPortfolioQueryHandler : IRequestHandler<GetPortfolioQuery, GetPo
             }
 
             _logger.LogInformation("Successfully retrieved portfolio {PortfolioId} (Version: {Version})", 
-                portfolio.Id, portfolio.Version);
+                portfolio.Id, portfolio.AggregateVersion);
 
             return GetPortfolioResult.Success(portfolio);
         }

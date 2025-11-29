@@ -109,5 +109,11 @@ public class InvestmentRepository : IInvestmentRepository
             .Where(i => i.PortfolioId == portfolioId && i.Symbol.AssetType == assetType)
             .ToListAsync(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<Investment>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Investments.ToListAsync(cancellationToken);
+    }
 }
 

@@ -86,14 +86,38 @@ public class InvestmentFlowTests : IAsyncLifetime
         var portfolio = await portfolioResponse.Content.ReadFromJsonAsync<PortfolioDto>();
         var portfolioId = portfolio!.Id;
 
+        // Poll for portfolio availability (Read Model eventual consistency)
+        bool portfolioReady = false;
+        for (int i = 0; i < 10; i++)
+        {
+            var checkResponse = await _client.GetAsync($"/api/portfolios/{portfolioId}");
+            if (checkResponse.IsSuccessStatusCode)
+            {
+                portfolioReady = true;
+                break;
+            }
+            Console.WriteLine($"[Test Debug] Poll {i + 1}: Portfolio {portfolioId} not found. Status: {checkResponse.StatusCode}");
+            await Task.Delay(1000);
+        }
+
+        portfolioReady.Should().BeTrue($"Portfolio {portfolioId} should be available in Read Model");
+
         // 2. Add Investment
         var addInvestmentCommand = new AddInvestmentDto
         {
             PortfolioId = portfolioId,
-            Symbol = "AAPL",
-            PurchasePrice = 150.00m,
+            Symbol = new SymbolDto 
+            { 
+                Ticker = "AAPL", 
+                Exchange = "NASDAQ", 
+                AssetType = "Stock" 
+            },
+            PurchasePrice = new MoneyDto 
+            { 
+                Amount = 150.00m, 
+                Currency = "USD" 
+            },
             Quantity = 10,
-            Currency = "USD",
             PurchaseDate = DateTime.UtcNow
         };
 
@@ -107,7 +131,8 @@ public class InvestmentFlowTests : IAsyncLifetime
         
         investmentResponse.EnsureSuccessStatusCode();
 
-        var investmentId = await investmentResponse.Content.ReadFromJsonAsync<Guid>();
+        var investment = await investmentResponse.Content.ReadFromJsonAsync<InvestmentDto>();
+        var investmentId = investment!.Id;
 
         // 3. Verify Investment Created (Immediate Read Model update via API or eventual consistency?)
         // The API likely returns 202 Accepted or 201 Created.
@@ -129,7 +154,7 @@ public class InvestmentFlowTests : IAsyncLifetime
             if (getPortfolioResponse.IsSuccessStatusCode)
             {
                 var updatedPortfolio = await getPortfolioResponse.Content.ReadFromJsonAsync<PortfolioDto>();
-                if (updatedPortfolio!.TotalValue == expectedTotalValue)
+                if (updatedPortfolio!.TotalValue.Amount == expectedTotalValue)
                 {
                     isUpdated = true;
                     break;
@@ -150,19 +175,36 @@ public class UserDto
     public string Email { get; set; } = "";
 }
 
-public class AddInvestmentDto
-{
-    public Guid PortfolioId { get; set; }
-    public string Symbol { get; set; }
-    public decimal PurchasePrice { get; set; }
-    public decimal Quantity { get; set; }
-    public string Currency { get; set; }
-    public DateTime PurchaseDate { get; set; }
-}
+    public class AddInvestmentDto
+    {
+        public Guid PortfolioId { get; set; }
+        public SymbolDto Symbol { get; set; }
+        public MoneyDto PurchasePrice { get; set; }
+        public decimal Quantity { get; set; }
+        public DateTime PurchaseDate { get; set; }
+    }
+
+    public class SymbolDto
+    {
+        public string Ticker { get; set; }
+        public string Exchange { get; set; }
+        public string AssetType { get; set; }
+    }
+
+    public class MoneyDto
+    {
+        public decimal Amount { get; set; }
+        public string Currency { get; set; }
+    }
 
 public class PortfolioDto
 {
     public Guid Id { get; set; }
     public string Name { get; set; }
-    public decimal TotalValue { get; set; }
+    public MoneyDto TotalValue { get; set; }
+}
+
+public class InvestmentDto
+{
+    public Guid Id { get; set; }
 }

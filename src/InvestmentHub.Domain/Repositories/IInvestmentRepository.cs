@@ -91,4 +91,11 @@ public interface IInvestmentRepository
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of investments</returns>
     Task<IEnumerable<Investment>> GetByAssetTypeAsync(PortfolioId portfolioId, AssetType assetType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all investments in the repository.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Collection of all investments</returns>
+    Task<IEnumerable<Investment>> GetAllAsync(CancellationToken cancellationToken = default);
 }

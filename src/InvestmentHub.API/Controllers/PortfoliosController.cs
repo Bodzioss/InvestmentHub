@@ -50,7 +50,7 @@ public class PortfoliosController : ControllerBase
                 return CreatedAtAction(
                     nameof(GetPortfolio),
                     new { portfolioId = result.PortfolioId.Value.ToString() },
-                    new { PortfolioId = result.PortfolioId.Value.ToString() });
+                    new { Id = result.PortfolioId.Value.ToString() });
             }
 
             return BadRequest(new { Error = result.ErrorMessage });

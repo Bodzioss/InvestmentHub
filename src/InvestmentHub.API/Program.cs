@@ -1,27 +1,32 @@
-﻿using Microsoft.OpenApi.Models;
-using FluentValidation;
+﻿using FluentValidation;
 using FluentValidation.AspNetCore;
-using InvestmentHub.Infrastructure.Data;
-using InvestmentHub.Infrastructure.Data.Repositories;
+using HealthChecks.UI.Client;
+using InvestmentHub.API.Extensions;
+using InvestmentHub.API.Mapping;
+using InvestmentHub.API.Middleware;
+using InvestmentHub.Domain.Behaviors;
+using InvestmentHub.Domain.Handlers.Commands;
+using InvestmentHub.Domain.Interfaces;
+using InvestmentHub.Domain.Projections;
+using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Domain.Repositories;
 using InvestmentHub.Domain.Services;
-using Microsoft.EntityFrameworkCore;
-using MediatR;
-using InvestmentHub.Domain.Handlers.Commands;
-using InvestmentHub.Domain.Behaviors;
 using InvestmentHub.Domain.Validators;
-using InvestmentHub.API.Mapping;
+using InvestmentHub.Infrastructure.Data;
+using InvestmentHub.Infrastructure.Data.Repositories;
+using InvestmentHub.Infrastructure.MarketData;
+using InvestmentHub.Infrastructure.Projections;
 using Marten;
 using Marten.Events;
-using InvestmentHub.API.Middleware;
-using MassTransit;
 using Marten.Events.Daemon.Resiliency;
-using InvestmentHub.Domain.ReadModels;
-using InvestmentHub.Infrastructure.Projections;
 using Marten.Events.Projections;
-using InvestmentHub.Domain.Projections;
+using MassTransit;
+using MediatR;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,6 +112,9 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 // Register domain services
 builder.Services.AddScoped<IPortfolioValuationService, PortfolioValuationService>();
 
+// Add resilience services
+builder.Services.AddResilienceServices();
+
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -180,6 +188,19 @@ builder.Services.AddMassTransit(x =>
     });
 });
 
+// Add health checks for infrastructure dependencies
+builder.Services.AddInfrastructureHealthChecks(builder.Configuration);
+
+// Add Market Data Provider
+builder.Services.AddScoped<IMarketDataProvider, YahooMarketDataProvider>();
+
+// Add Background Jobs
+builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.PriceUpdateJob>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.HistoricalImportJob>();
+
+// Add Hangfire services
+builder.Services.AddHangfireServices(builder.Configuration);
+
 var app = builder.Build();
 
 // Log Seq configuration status
@@ -239,8 +260,20 @@ app.UseCors("AllowAll");
 // This catches all exceptions from controllers and other middleware
 app.UseExceptionHandler();
 
-// Map default endpoints (health checks)
-app.MapDefaultEndpoints();
+// Map health check UI (optional - for dashboard)
+app.MapHealthChecksUI(options =>
+{
+    options.UIPath = "/healthchecks-ui";
+});
+
+// Map health check endpoint with JSON response for UI compatibility
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+// Use Hangfire Dashboard
+app.UseHangfireDashboard();
 
 // Map controllers
 app.MapControllers();

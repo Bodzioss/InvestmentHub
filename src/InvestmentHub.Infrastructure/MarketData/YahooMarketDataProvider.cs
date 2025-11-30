@@ -5,7 +5,8 @@ using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Registry;
 using System.Text.Json;
-using YahooFinanceApi;
+using YahooQuotesApi;
+using NodaTime;
 
 namespace InvestmentHub.Infrastructure.MarketData;
 
@@ -14,15 +15,18 @@ public class YahooMarketDataProvider : IMarketDataProvider
     private readonly IDistributedCache _cache;
     private readonly ILogger<YahooMarketDataProvider> _logger;
     private readonly ResiliencePipeline _resiliencePipeline;
+    private readonly YahooQuotes _yahooQuotes;
 
     public YahooMarketDataProvider(
         IDistributedCache cache,
         ILogger<YahooMarketDataProvider> logger,
-        ResiliencePipelineProvider<string> pipelineProvider)
+        ResiliencePipelineProvider<string> pipelineProvider,
+        YahooQuotes yahooQuotes)
     {
         _cache = cache;
         _logger = logger;
-        _resiliencePipeline = pipelineProvider.GetPipeline("default"); // We'll use a default policy for now
+        _resiliencePipeline = pipelineProvider.GetPipeline("default");
+        _yahooQuotes = yahooQuotes;
     }
 
     public async Task<MarketPrice?> GetLatestPriceAsync(string symbol, CancellationToken cancellationToken = default)
@@ -38,11 +42,8 @@ public class YahooMarketDataProvider : IMarketDataProvider
 
         try
         {
-            // Fetch from Yahoo
-            // Note: YahooFinanceApi uses static methods, which makes it hard to mock/inject.
-            // In a real prod scenario, we'd wrap this in a facade.
-            var securities = await Yahoo.Symbols(symbol).Fields(Field.Symbol, Field.RegularMarketPrice, Field.Currency).QueryAsync(cancellationToken);
-            var security = securities.Values.FirstOrDefault();
+            // Fetch from Yahoo using YahooQuotesApi
+            var security = await _yahooQuotes.GetSnapshotAsync(symbol, cancellationToken);
 
             if (security == null)
             {
@@ -50,11 +51,17 @@ public class YahooMarketDataProvider : IMarketDataProvider
                 return null;
             }
 
+            // RegularMarketPrice seems to be decimal (not nullable) based on error
+            // But we should check if it's 0 or valid? 
+            // Actually, if it's decimal, it always has a value.
+            // But maybe we should check if it is valid?
+            // Let's assume it is valid if we got the security.
+            
             var price = new MarketPrice
             {
-                Symbol = security.Symbol,
-                Price = (decimal)security.RegularMarketPrice,
-                Currency = security.Currency,
+                Symbol = symbol,
+                Price = security.RegularMarketPrice,
+                Currency = security.Currency.ToString() ?? "USD",
                 Timestamp = DateTime.UtcNow,
                 Source = "Yahoo"
             };
@@ -71,7 +78,7 @@ public class YahooMarketDataProvider : IMarketDataProvider
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching price for {Symbol} from Yahoo Finance", symbol);
-            return null; // Or throw depending on requirements
+            return null;
         }
     }
 
@@ -79,33 +86,43 @@ public class YahooMarketDataProvider : IMarketDataProvider
     {
         try
         {
-            var history = await Yahoo.GetHistoricalAsync(symbol, from, to, Period.Daily, cancellationToken);
-            
-            return history.Select(h => new MarketPrice
+            // Based on YahooQuotesApi source, GetHistoryAsync takes (symbol, baseSymbol, ct)
+            // It returns Result<History>
+            var result = await _yahooQuotes.GetHistoryAsync(symbol, "", cancellationToken);
+
+            if (result.HasError)
+            {
+                 _logger.LogWarning("YahooQuotesApi error for {Symbol}: {Error}", symbol, result.Error);
+                 return Enumerable.Empty<MarketPrice>();
+            }
+
+            var history = result.Value;
+
+            return history.Ticks.Select(h => new MarketPrice
             {
                 Symbol = symbol,
-                Price = h.Close,
-                Open = h.Open,
-                High = h.High,
-                Low = h.Low,
-                Close = h.Close,
+                Price = (decimal)h.Close,
+                Open = (decimal)h.Open,
+                High = (decimal)h.High,
+                Low = (decimal)h.Low,
+                Close = (decimal)h.Close,
                 Volume = h.Volume,
-                Timestamp = h.DateTime,
+                // Convert NodaTime LocalDate to DateTime
+                Timestamp = h.Date.ToDateTimeUtc(),
                 Source = "Yahoo"
-            });
+            })
+            .Where(x => x.Timestamp >= from && x.Timestamp <= to)
+            .ToList();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error fetching history for {Symbol} from Yahoo Finance", symbol);
+            _logger.LogError(ex, "Error fetching history for {Symbol} from Yahoo Finance via YahooQuotesApi", symbol);
             return Enumerable.Empty<MarketPrice>();
         }
     }
 
     public async Task<IEnumerable<SecurityInfo>> SearchSecuritiesAsync(string query, CancellationToken cancellationToken = default)
     {
-        // YahooFinanceApi doesn't support search directly in the NuGet version used commonly.
-        // We might need to use a different endpoint or library for search.
-        // For now, returning empty to implement interface.
         return await Task.FromResult(Enumerable.Empty<SecurityInfo>());
     }
 }

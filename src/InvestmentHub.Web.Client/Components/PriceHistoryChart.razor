@@ -1,0 +1,133 @@
+@using Fluxor
+@using InvestmentHub.Web.Client.Store.MarketData
+@using MudBlazor
+@inject IState<MarketDataState> MarketDataState
+@inject IDispatcher Dispatcher
+
+<MudPaper Class="pa-4" Elevation="2">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h6">Price History: @Symbol</MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Outlined" 
+                       Size="Size.Small" 
+                       OnClick="@(() => FetchHistory("1M"))"
+                       Color="@(_selectedPeriod == "1M" ? Color.Primary : Color.Default)">1M</MudButton>
+            <MudButton Variant="Variant.Outlined" 
+                       Size="Size.Small" 
+                       OnClick="@(() => FetchHistory("3M"))"
+                       Color="@(_selectedPeriod == "3M" ? Color.Primary : Color.Default)">3M</MudButton>
+            <MudButton Variant="Variant.Outlined" 
+                       Size="Size.Small" 
+                       OnClick="@(() => FetchHistory("1Y"))"
+                       Color="@(_selectedPeriod == "1Y" ? Color.Primary : Color.Default)">1Y</MudButton>
+            <MudButton Variant="Variant.Filled" 
+                       Size="Size.Small" 
+                       Color="Color.Secondary" 
+                       StartIcon="@Icons.Material.Filled.CloudDownload"
+                       OnClick="ImportHistory">Import</MudButton>
+        </MudStack>
+    </MudStack>
+
+    @if (MarketDataState.Value.IsLoading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!MarketDataState.Value.SelectedHistory.Any())
+    {
+        <MudAlert Severity="Severity.Info">No history available for this symbol. Click 'Import' to fetch data.</MudAlert>
+    }
+    else
+    {
+        <MudChart ChartType="ChartType.Line" 
+                  ChartSeries="@_series" 
+                  XAxisLabels="@_xAxisLabels" 
+                  Width="100%" 
+                  Height="350px" />
+    }
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string Symbol { get; set; } = string.Empty;
+
+    private string _selectedPeriod = "1Y";
+    private List<ChartSeries> _series = new();
+    private string[] _xAxisLabels = Array.Empty<string>();
+
+    protected override void OnInitialized()
+    {
+        MarketDataState.StateChanged += (sender, args) => UpdateChartData();
+        base.OnInitialized();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(Symbol))
+        {
+            FetchHistory(_selectedPeriod);
+        }
+        base.OnParametersSet();
+    }
+
+    private void FetchHistory(string period)
+    {
+        _selectedPeriod = period;
+        // Logic to filter by period could be added here or in the API
+        // For now, we just fetch everything and filter locally if needed, 
+        // or just trigger the fetch action which gets 1 year by default in controller
+        Dispatcher.Dispatch(new FetchHistoryAction(Symbol));
+    }
+
+    private void ImportHistory()
+    {
+        Dispatcher.Dispatch(new ImportHistoryAction(Symbol));
+    }
+
+    private void UpdateChartData()
+    {
+        var history = MarketDataState.Value.SelectedHistory;
+        if (history == null || !history.Any())
+        {
+            _series.Clear();
+            _xAxisLabels = Array.Empty<string>();
+            StateHasChanged();
+            return;
+        }
+
+        // Filter based on period (simple logic)
+        var cutoff = _selectedPeriod switch
+        {
+            "1M" => DateTime.UtcNow.AddMonths(-1),
+            "3M" => DateTime.UtcNow.AddMonths(-3),
+            "1Y" => DateTime.UtcNow.AddYears(-1),
+            _ => DateTime.UtcNow.AddYears(-1)
+        };
+
+        var filteredHistory = history
+            .Where(h => h.Timestamp >= cutoff)
+            .OrderBy(h => h.Timestamp)
+            .ToList();
+
+        if (!filteredHistory.Any()) return;
+
+        _series = new List<ChartSeries>
+        {
+            new ChartSeries
+            {
+                Name = Symbol,
+                Data = filteredHistory.Select(h => (double)h.Price).ToArray()
+            }
+        };
+
+        // Simplify labels to avoid clutter
+        // Show every Nth label depending on count
+        var count = filteredHistory.Count;
+        var step = count > 10 ? count / 10 : 1;
+        
+        _xAxisLabels = filteredHistory
+            .Select((h, i) => i % step == 0 ? h.Timestamp.ToShortDateString() : "")
+            .ToArray();
+
+        StateHasChanged();
+    }
+}

@@ -113,3 +113,20 @@ public class MoneyResponseDto
     /// <summary>Gets or sets the currency</summary>
     public string Currency { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Response DTO for Market Price information.
+/// </summary>
+public class MarketPriceDto
+{
+    public string Symbol { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public string Currency { get; set; } = string.Empty;
+    public decimal? Open { get; set; }
+    public decimal? High { get; set; }
+    public decimal? Low { get; set; }
+    public decimal? Close { get; set; }
+    public long? Volume { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string Source { get; set; } = string.Empty;
+}

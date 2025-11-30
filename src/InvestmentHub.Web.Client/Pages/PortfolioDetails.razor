@@ -3,11 +3,13 @@
 @using InvestmentHub.Web.Client.Store.Portfolio
 @using InvestmentHub.Web.Client.Store.Investment
 @using InvestmentHub.Web.Client.Store.User
+@using InvestmentHub.Web.Client.Store.MarketData
 @using InvestmentHub.Contracts
 @using InvestmentHub.Web.Client.Components
 @inject IState<PortfolioState> PortfolioState
 @inject IState<InvestmentState> InvestmentState
 @inject IState<UserState> UserState
+@inject IState<MarketDataState> MarketDataState
 @inject IDispatcher Dispatcher
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
@@ -128,11 +130,10 @@ else
                         <MudTh>Type</MudTh>
                         <MudTh>Quantity</MudTh>
                         <MudTh>Purchase Price</MudTh>
-                        <MudTh>Current Value</MudTh>
-                        <MudTh>Total Value</MudTh>
+                        <MudTh>Market Price</MudTh>
+                        <MudTh>Market Value</MudTh>
                         <MudTh>Gain/Loss</MudTh>
                         <MudTh>Status</MudTh>
-                        <MudTh>Purchase Date</MudTh>
                         <MudTh>Actions</MudTh>
                     </HeaderContent>
                     <RowTemplate>
@@ -151,36 +152,71 @@ else
                         <MudTd DataLabel="Purchase Price">
                             @context.PurchasePrice.Amount.ToString("N2") @context.PurchasePrice.Currency
                         </MudTd>
-                        <MudTd DataLabel="Current Value">
-                            @context.CurrentValue.Amount.ToString("N2") @context.CurrentValue.Currency
+                        <MudTd DataLabel="Market Price">
+                            @{
+                                var marketPrice = GetMarketPrice(context.Symbol.Ticker);
+                            }
+                            @if (marketPrice != null)
+                            {
+                                <MudText Typo="Typo.body2">@marketPrice.Price.ToString("N2") @marketPrice.Currency</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@marketPrice.Timestamp.ToLocalTime().ToString("g")</MudText>
+                            }
+                            else
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
                         </MudTd>
-                        <MudTd DataLabel="Total Value">
-                            @((context.CurrentValue.Amount * context.Quantity).ToString("N2")) @context.CurrentValue.Currency
+                        <MudTd DataLabel="Market Value">
+                            @{
+                                var marketPrice = GetMarketPrice(context.Symbol.Ticker);
+                                var marketValue = marketPrice != null ? marketPrice.Price * context.Quantity : 0;
+                                var currency = marketPrice?.Currency ?? context.CurrentValue.Currency;
+                            }
+                            @if (marketPrice != null)
+                            {
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@marketValue.ToString("N2") @currency</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                            }
                         </MudTd>
                         <MudTd DataLabel="Gain/Loss">
                             @{
-                                var gainLoss = (context.CurrentValue.Amount - context.PurchasePrice.Amount) * context.Quantity;
-                                var percentage = context.PurchasePrice.Amount > 0 
-                                    ? ((context.CurrentValue.Amount - context.PurchasePrice.Amount) / context.PurchasePrice.Amount * 100) 
-                                    : 0;
+                                var marketPrice = GetMarketPrice(context.Symbol.Ticker);
+                                var marketValue = marketPrice != null ? marketPrice.Price * context.Quantity : 0;
+                                var cost = context.PurchasePrice.Amount * context.Quantity;
+                                var gainLoss = marketValue - cost;
+                                var percentage = cost > 0 ? (gainLoss / cost * 100) : 0;
                             }
-                            <MudStack Spacing="0">
-                                <MudText Typo="Typo.body2" Color="@GetGainLossColor(gainLoss)">
-                                    @gainLoss.ToString("N2")
-                                </MudText>
-                                <MudText Typo="Typo.caption" Color="@GetGainLossColor(gainLoss)">
-                                    (@percentage.ToString("N2")%)
-                                </MudText>
-                            </MudStack>
+                            @if (marketPrice != null)
+                            {
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.body2" Color="@GetGainLossColor(gainLoss)">
+                                        @gainLoss.ToString("N2")
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="@GetGainLossColor(gainLoss)">
+                                        (@percentage.ToString("N2")%)
+                                    </MudText>
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                            }
                         </MudTd>
                         <MudTd DataLabel="Status">
                             <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">
                                 @context.Status
                             </MudChip>
                         </MudTd>
-                        <MudTd DataLabel="Purchase Date">@context.PurchaseDate.ToShortDateString()</MudTd>
                         <MudTd DataLabel="Actions">
                             <MudStack Row="true" Spacing="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.ShowChart" 
+                                             Size="Size.Small" 
+                                             Color="Color.Info"
+                                             OnClick="@(() => OpenPriceHistoryDialog(context))" 
+                                             Title="View History" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" 
                                              Size="Size.Small" 
                                              Color="Color.Primary"
@@ -208,12 +244,14 @@ else
     public string PortfolioId { get; set; } = string.Empty;
 
     private PortfolioResponseDto? _currentPortfolio;
+    private HashSet<string> _fetchedSymbols = new();
 
     protected override void OnInitialized()
     {
         // Subscribe to state changes
         PortfolioState.StateChanged += (sender, args) => OnStateChanged();
-        InvestmentState.StateChanged += (sender, args) => StateHasChanged();
+        InvestmentState.StateChanged += (sender, args) => OnInvestmentStateChanged();
+        MarketDataState.StateChanged += (sender, args) => StateHasChanged();
         
         base.OnInitialized();
     }
@@ -230,6 +268,32 @@ else
         StateHasChanged();
     }
 
+    private void OnInvestmentStateChanged()
+    {
+        // When investments are loaded, fetch prices for them
+        if (!InvestmentState.Value.IsLoading && InvestmentState.Value.Investments.Any())
+        {
+            foreach (var investment in InvestmentState.Value.Investments)
+            {
+                if (!_fetchedSymbols.Contains(investment.Symbol.Ticker))
+                {
+                    _fetchedSymbols.Add(investment.Symbol.Ticker);
+                    Dispatcher.Dispatch(new FetchPriceAction(investment.Symbol.Ticker));
+                }
+            }
+        }
+        StateHasChanged();
+    }
+
+    private MarketPriceDto? GetMarketPrice(string symbol)
+    {
+        if (MarketDataState.Value.Prices.TryGetValue(symbol, out var price))
+        {
+            return price;
+        }
+        return null;
+    }
+
     private void LoadPortfolioAndInvestments()
     {
         // Find the portfolio from the store
@@ -239,6 +303,7 @@ else
         if (!string.IsNullOrEmpty(PortfolioId))
         {
             Dispatcher.Dispatch(new LoadInvestmentsAction(PortfolioId));
+            _fetchedSymbols.Clear(); // Reset fetched symbols when reloading portfolio
         }
     }
 
@@ -296,6 +361,29 @@ else
         };
 
         var dialog = await DialogService.ShowAsync<SellInvestmentDialog>("Sell Investment", parameters, options);
+        await dialog.Result;
+    }
+
+    private async Task OpenPriceHistoryDialog(InvestmentResponseDto investment)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Symbol", investment.Symbol.Ticker }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true, 
+            MaxWidth = MaxWidth.Large, 
+            FullWidth = true 
+        };
+
+        // We can use a simple dialog that contains the PriceHistoryChart
+        // Since we don't have a dedicated dialog component for this yet, 
+        // we'll need to create one or use an inline dialog if MudBlazor supports it easily.
+        // Better to create a wrapper dialog component.
+        
+        var dialog = await DialogService.ShowAsync<PriceHistoryDialog>($"Price History: {investment.Symbol.Ticker}", parameters, options);
         await dialog.Result;
     }
 

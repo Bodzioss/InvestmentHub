@@ -93,10 +93,9 @@ public static class ResilienceExtensions
         }
 
         // Yahoo Finance API health check
-        healthChecksBuilder.AddCheck(
+        healthChecksBuilder.AddCheck<YahooFinanceHealthCheck>(
             "yahoo_finance",
-            new YahooFinanceHealthCheck(),
-            HealthStatus.Degraded,
+            failureStatus: HealthStatus.Degraded,
             tags: new[] { "external", "market-data" });
 
         // Add Health Checks UI

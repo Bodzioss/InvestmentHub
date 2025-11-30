@@ -52,6 +52,10 @@ builder.Services
     .AddRefitClient<InvestmentHub.Web.Client.Services.IInvestmentsApi>()
     .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
 
+builder.Services
+    .AddRefitClient<InvestmentHub.Web.Client.Services.IMarketDataApi>()
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
+
 builder.Services.AddScoped<LayoutService>();
 
 await builder.Build().RunAsync();

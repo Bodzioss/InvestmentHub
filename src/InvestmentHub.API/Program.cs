@@ -27,6 +27,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using YahooQuotesApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -190,6 +191,9 @@ builder.Services.AddMassTransit(x =>
 
 // Add health checks for infrastructure dependencies
 builder.Services.AddInfrastructureHealthChecks(builder.Configuration);
+
+// Register YahooQuotes service
+builder.Services.AddSingleton(new YahooQuotesBuilder().Build());
 
 // Add Market Data Provider
 builder.Services.AddScoped<IMarketDataProvider, YahooMarketDataProvider>();

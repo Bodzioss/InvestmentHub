@@ -4,6 +4,8 @@
 
 <MudThemeProvider Theme="@_theme" IsDarkMode="@LayoutService.IsDarkMode" />
 <MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
 <MudLayout>
     <MudAppBar Elevation="1">
@@ -41,9 +43,12 @@
                 Primary = Colors.Blue.Default,
                 Secondary = Colors.Green.Accent4,
                 AppbarBackground = Colors.Blue.Darken2,
-                Background = Colors.Grey.Lighten5,
+                Background = Colors.Gray.Lighten5,
                 Surface = Colors.Shades.White,
                 DrawerBackground = Colors.Shades.White,
+                TextPrimary = Colors.Gray.Darken4,
+                TextSecondary = Colors.Gray.Darken2,
+                ActionDefault = Colors.Gray.Darken3,
             },
             PaletteDark = new PaletteDark()
             {

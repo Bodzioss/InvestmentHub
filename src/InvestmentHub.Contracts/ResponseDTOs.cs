@@ -130,3 +130,16 @@ public class MarketPriceDto
     public DateTime Timestamp { get; set; }
     public string Source { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Response DTO for Instrument entity.
+/// </summary>
+public class InstrumentDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Ticker { get; set; } = string.Empty;
+    public string Exchange { get; set; } = string.Empty;
+    public string AssetType { get; set; } = string.Empty;
+    public string Isin { get; set; } = string.Empty;
+}

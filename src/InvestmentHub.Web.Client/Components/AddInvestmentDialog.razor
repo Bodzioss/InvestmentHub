@@ -16,23 +16,6 @@
                     <MudText Typo="Typo.subtitle2" Class="mb-2">Symbol Information</MudText>
                 </MudItem>
                 
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="_ticker" 
-                                 Label="Ticker Symbol" 
-                                 Required="true" 
-                                 RequiredError="Ticker is required"
-                                 Variant="Variant.Outlined" />
-                </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="_exchange" 
-                                 Label="Exchange" 
-                                 Required="true" 
-                                 RequiredError="Exchange is required"
-                                 Variant="Variant.Outlined" 
-                                 Placeholder="e.g., NYSE, NASDAQ" />
-                </MudItem>
-
                 <MudItem xs="12">
                     <MudSelect @bind-Value="_assetType" 
                               Label="Asset Type" 
@@ -44,6 +27,40 @@
                         <MudSelectItem Value="@("ETF")">ETF</MudSelectItem>
                         <MudSelectItem Value="@("Crypto")">Cryptocurrency</MudSelectItem>
                     </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                     <MudAutocomplete T="string"
+                                     Label="Exchange"
+                                     @bind-Value="_exchange"
+                                     SearchFunc="@SearchExchanges"
+                                     ResetValueOnEmptyText="true"
+                                     CoerceText="true"
+                                     CoerceValue="true"
+                                     Variant="Variant.Outlined"
+                                     Required="true"
+                                     RequiredError="Exchange is required" 
+                                     Placeholder="e.g., NYSE, NASDAQ" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudAutocomplete T="InstrumentDto"
+                                     Label="Ticker Symbol"
+                                     Value="_selectedInstrument"
+                                     SearchFunc="@SearchInstruments"
+                                     ToStringFunc="@(e => e == null ? null : e.Ticker)"
+                                     ValueChanged="@OnInstrumentSelected"
+                                     ResetValueOnEmptyText="true"
+                                     CoerceText="false"
+                                     Variant="Variant.Outlined"
+                                     Required="true"
+                                     RequiredError="Ticker is required"
+                                     AdornmentIcon="@Icons.Material.Filled.Search">
+                        <ItemTemplate Context="e">
+                            <MudText Typo="Typo.body1">@e.Ticker</MudText>
+                            <MudText Typo="Typo.caption">@e.Name</MudText>
+                        </ItemTemplate>
+                    </MudAutocomplete>
                 </MudItem>
 
                 <!-- Purchase Information -->
@@ -138,6 +155,9 @@
     private ISnackbar Snackbar { get; set; } = null!;
 
     [Inject]
+    private IInstrumentsApi InstrumentsApi { get; set; } = null!;
+
+    [Inject]
     private IInvestmentsApi InvestmentsApi { get; set; } = null!;
 
     private MudForm _form = null!;
@@ -145,9 +165,10 @@
     private bool _isSubmitting;
 
     // Symbol fields
+    private InstrumentDto? _selectedInstrument;
     private string _ticker = string.Empty;
     private string _exchange = string.Empty;
-    private string _assetType = "Stock";
+    private string? _assetType;
 
     // Purchase fields
     private decimal _quantity = 1;
@@ -160,6 +181,57 @@
         MudDialog.Cancel();
     }
 
+    private async Task<IEnumerable<InstrumentDto>> SearchInstruments(string value, CancellationToken token)
+    {
+        try 
+        {
+            // If we have a selected instrument and the text matches, return it
+            if (_selectedInstrument != null && 
+                (_selectedInstrument.Ticker == value || _selectedInstrument.Name == value))
+            {
+                return new[] { _selectedInstrument };
+            }
+
+            var results = await InstrumentsApi.GetInstrumentsAsync(value, _assetType, _exchange);
+            return results;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error searching instruments: {ex.Message}");
+            return Enumerable.Empty<InstrumentDto>();
+        }
+    }
+
+    private void OnInstrumentSelected(InstrumentDto instrument)
+    {
+        if (instrument == null) return;
+
+        _selectedInstrument = instrument;
+        _ticker = instrument.Ticker;
+        
+        // Auto-populate other fields if they match or are empty
+        if (!string.IsNullOrEmpty(instrument.Exchange))
+        {
+            _exchange = instrument.Exchange;
+        }
+
+        if (!string.IsNullOrEmpty(instrument.AssetType))
+        {
+            _assetType = instrument.AssetType;
+        }
+    }
+
+    private async Task<IEnumerable<string>> SearchExchanges(string value, CancellationToken token)
+    {
+        // Hardcoded list of common exchanges for now, plus whatever the user types
+        var exchanges = new[] { "NASDAQ", "NYSE", "GPW", "NewConnect", "Catalyst", "GlobalConnect", "LSE", "XETRA" };
+        
+        if (string.IsNullOrEmpty(value))
+            return exchanges;
+            
+        return exchanges.Where(x => x.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
     private async Task Submit()
     {
         if (!_isValid || _isSubmitting || !_purchaseDate.HasValue)
@@ -169,12 +241,15 @@
 
         try
         {
+            // Use selected instrument ticker if available, otherwise use typed value
+            var finalTicker = _selectedInstrument?.Ticker ?? _ticker;
+
             var request = new AddInvestmentRequest
             {
                 PortfolioId = PortfolioId,
                 Symbol = new SymbolRequest
                 {
-                    Ticker = _ticker.ToUpper(),
+                    Ticker = finalTicker.ToUpper(),
                     Exchange = _exchange.ToUpper(),
                     AssetType = _assetType
                 },
@@ -195,7 +270,7 @@
             // Reload investments after adding
             Dispatcher.Dispatch(new LoadInvestmentsAction(PortfolioId));
 
-            Snackbar.Add($"Investment in {_ticker} added successfully!", Severity.Success);
+            Snackbar.Add($"Investment in {finalTicker} added successfully!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (InvestmentHubApiException ex)

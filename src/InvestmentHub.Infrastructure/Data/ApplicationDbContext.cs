@@ -210,6 +210,14 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(i => i.Status);
             entity.HasIndex(i => new { i.PortfolioId, i.Status });
         });
+
+        // Apply all configurations from assembly
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
     }
+
+    /// <summary>
+    /// Gets or sets the Instruments DbSet.
+    /// </summary>
+    public DbSet<Instrument> Instruments => Set<Instrument>();
 }
 

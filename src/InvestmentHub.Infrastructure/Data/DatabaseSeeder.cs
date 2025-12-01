@@ -16,8 +16,10 @@ public static class DatabaseSeeder
     /// <param name="context">The database context</param>
     public static async Task SeedAsync(ApplicationDbContext context)
     {
-        // Ensure database is created
-        await context.Database.EnsureCreatedAsync();
+        // Apply pending migrations
+        // NOTE: If this fails with "relation already exists", it means the database was created with EnsureCreatedAsync previously.
+        // In that case, the development database volume needs to be deleted to start fresh with migrations.
+        await context.Database.MigrateAsync();
 
         // Check if data already exists
         if (await context.Users.AnyAsync())
@@ -180,5 +182,10 @@ public static class DatabaseSeeder
         await context.SaveChangesAsync();
 
         Console.WriteLine("Database seeded successfully with sample data!");
+
+        // Import instruments
+        var importer = new InstrumentImporter(context);
+        var instrumentFilePath = Path.Combine("d:\\Github\\InvestmentHub", "all_instruments_list.json");
+        await importer.ImportAsync(instrumentFilePath);
     }
 }

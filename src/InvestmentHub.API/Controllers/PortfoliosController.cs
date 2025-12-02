@@ -47,10 +47,25 @@ public class PortfoliosController : ControllerBase
 
             if (result.IsSuccess && result.PortfolioId != null)
             {
+                // Return full response to update UI immediately
+                var response = new PortfolioResponseDto
+                {
+                    Id = result.PortfolioId.Value.ToString(),
+                    Name = request.Name,
+                    Description = request.Description,
+                    OwnerId = request.OwnerId,
+                    CreatedDate = DateTime.UtcNow,
+                    LastUpdated = DateTime.UtcNow,
+                    TotalValue = new MoneyResponseDto { Amount = 0, Currency = request.Currency },
+                    TotalCost = new MoneyResponseDto { Amount = 0, Currency = request.Currency },
+                    UnrealizedGainLoss = new MoneyResponseDto { Amount = 0, Currency = request.Currency },
+                    ActiveInvestmentCount = 0
+                };
+
                 return CreatedAtAction(
                     nameof(GetPortfolio),
                     new { portfolioId = result.PortfolioId.Value.ToString() },
-                    new { Id = result.PortfolioId.Value.ToString() });
+                    response);
             }
 
             return BadRequest(new { Error = result.ErrorMessage });

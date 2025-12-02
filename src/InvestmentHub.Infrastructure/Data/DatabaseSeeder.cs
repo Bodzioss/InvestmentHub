@@ -22,7 +22,7 @@ public static class DatabaseSeeder
         await context.Database.MigrateAsync();
 
         // Check if data already exists
-        if (await context.Users.AnyAsync())
+        if (await context.DomainUsers.AnyAsync())
         {
             return; // Data already seeded
         }
@@ -50,7 +50,7 @@ public static class DatabaseSeeder
             )
         };
 
-        await context.Users.AddRangeAsync(users);
+        await context.DomainUsers.AddRangeAsync(users);
         await context.SaveChangesAsync();
 
         // Create sample portfolios

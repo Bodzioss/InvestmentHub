@@ -58,7 +58,8 @@ public class InvestmentMappingProfile : Profile
                 PortfolioId.New(),
                 UserId.FromString(src.OwnerId),
                 src.Name,
-                src.Description))
+                src.Description,
+                src.Currency))
             .ForAllMembers(opt => opt.Ignore());
 
         // Domain entities to Response DTOs

@@ -101,7 +101,8 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
                 request.PortfolioId,
                 request.OwnerId,
                 request.Name,
-                request.Description);
+                request.Description,
+                request.Currency);
 
             // 5. Enrich session with Correlation ID before saving events
             // This ensures Correlation ID is included in event metadata

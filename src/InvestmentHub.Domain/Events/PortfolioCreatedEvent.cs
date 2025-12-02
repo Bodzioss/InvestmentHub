@@ -35,12 +35,18 @@ public class PortfolioCreatedEvent : DomainEvent
     public DateTime CreatedAt { get; }
     
     /// <summary>
+    /// Gets the currency of the portfolio.
+    /// </summary>
+    public string Currency { get; }
+
+    /// <summary>
     /// Initializes a new instance of the PortfolioCreatedEvent class.
     /// </summary>
     /// <param name="portfolioId">The unique identifier of the portfolio</param>
     /// <param name="ownerId">The unique identifier of the portfolio owner</param>
     /// <param name="name">The name of the portfolio</param>
     /// <param name="description">Optional description of the portfolio</param>
+    /// <param name="currency">The portfolio currency</param>
     /// <param name="createdAt">The creation date and time</param>
     /// <exception cref="ArgumentNullException">Thrown when required parameters are null</exception>
     /// <exception cref="ArgumentException">Thrown when name is empty or whitespace</exception>
@@ -49,6 +55,7 @@ public class PortfolioCreatedEvent : DomainEvent
         UserId ownerId,
         string name,
         string? description,
+        string currency,
         DateTime createdAt) : base(1)
     {
         PortfolioId = portfolioId ?? throw new ArgumentNullException(nameof(portfolioId));
@@ -59,6 +66,7 @@ public class PortfolioCreatedEvent : DomainEvent
         
         Name = name;
         Description = description;
+        Currency = currency;
         CreatedAt = createdAt;
     }
     

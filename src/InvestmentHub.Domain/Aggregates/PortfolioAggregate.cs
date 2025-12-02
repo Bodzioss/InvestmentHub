@@ -38,6 +38,9 @@ public class PortfolioAggregate : AggregateRoot
     /// <summary>Gets the reason for closing the portfolio.</summary>
     public string? CloseReason { get; private set; }
 
+    /// <summary>Gets the portfolio currency.</summary>
+    public string Currency { get; private set; } = "USD";
+
     // Marten requires a parameterless constructor for deserialization
     /// <summary>
     /// Initializes a new instance of the PortfolioAggregate class.
@@ -57,6 +60,7 @@ public class PortfolioAggregate : AggregateRoot
     /// <param name="ownerId">The owner user identifier</param>
     /// <param name="name">The portfolio name</param>
     /// <param name="description">Optional portfolio description</param>
+    /// <param name="currency">The portfolio currency</param>
     /// <returns>A new PortfolioAggregate instance with PortfolioCreatedEvent</returns>
     /// <exception cref="ArgumentNullException">Thrown when required parameters are null</exception>
     /// <exception cref="ArgumentException">Thrown when name is empty</exception>
@@ -64,7 +68,8 @@ public class PortfolioAggregate : AggregateRoot
         PortfolioId portfolioId,
         UserId ownerId,
         string name,
-        string? description = null)
+        string? description = null,
+        string currency = "USD")
     {
         if (portfolioId == null)
             throw new ArgumentNullException(nameof(portfolioId));
@@ -79,6 +84,7 @@ public class PortfolioAggregate : AggregateRoot
             ownerId,
             name,
             description,
+            currency,
             DateTime.UtcNow);
 
         aggregate.Apply(@event);
@@ -159,6 +165,7 @@ public class PortfolioAggregate : AggregateRoot
         OwnerId = @event.OwnerId;
         Name = @event.Name;
         Description = @event.Description;
+        Currency = @event.Currency;
         IsClosed = false;
         CreatedAt = @event.CreatedAt;
         Version++;

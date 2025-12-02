@@ -48,7 +48,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
             CreatedAt = @event.CreatedAt,
             IsClosed = false,
             TotalValue = 0,
-            Currency = "USD",
+            Currency = @event.Currency,
             InvestmentCount = 0,
             LastUpdated = @event.OccurredOn,
             AggregateVersion = @event.Version

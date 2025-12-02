@@ -21,28 +21,28 @@ public class UserRepository : IUserRepository
     /// <inheritdoc/>
     public async Task<IEnumerable<User>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.Users
+        return await _context.DomainUsers
             .ToListAsync(cancellationToken);
     }
 
     /// <inheritdoc/>
     public async Task<User?> GetByIdAsync(UserId userId, CancellationToken cancellationToken = default)
     {
-        return await _context.Users
+        return await _context.DomainUsers
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
     }
 
     /// <inheritdoc/>
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        return await _context.Users
+        return await _context.DomainUsers
             .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
     }
 
     /// <inheritdoc/>
     public async Task<bool> ExistsAsync(UserId userId, CancellationToken cancellationToken = default)
     {
-        return await _context.Users
+        return await _context.DomainUsers
             .AnyAsync(u => u.Id == userId, cancellationToken);
     }
 

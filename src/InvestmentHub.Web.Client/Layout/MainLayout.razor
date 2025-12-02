@@ -1,6 +1,11 @@
 ﻿@inherits LayoutComponentBase
 @using InvestmentHub.Web.Client.Services
 @inject LayoutService LayoutService
+@inject NavigationManager NavigationManager
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthStateProvider
+@using Fluxor
+@using InvestmentHub.Web.Client.Store.User
 
 <MudThemeProvider Theme="@_theme" IsDarkMode="@LayoutService.IsDarkMode" />
 <MudPopoverProvider />
@@ -12,10 +17,19 @@
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
         <MudText Typo="Typo.h5" Class="ml-3">Investment Hub</MudText>
         <MudSpacer />
-        <UserSelector />
+        <AuthorizeView>
+            <Authorized>
+                <MudText Class="mr-4">@context.User.Identity?.Name</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="Logout">Wyloguj</MudButton>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="@(() => NavigationManager.NavigateTo("/login"))">Logowanie</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@(() => NavigationManager.NavigateTo("/register"))" Class="ml-2">Rejestracja</MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
         <MudIconButton Icon="@(LayoutService.IsDarkMode ? Icons.Material.Filled.Brightness7 : Icons.Material.Filled.Brightness4)" 
                        Color="Color.Inherit" 
-                       OnClick="@LayoutService.ToggleDarkMode" />
+                       OnClick="@LayoutService.ToggleDarkMode" Class="ml-2" />
     </MudAppBar>
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
         <NavMenu />
@@ -30,6 +44,15 @@
 @code {
     private bool _drawerOpen = true;
     private MudTheme _theme = new();
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
+
+    [Inject]
+    private IDispatcher Dispatcher { get; set; } = default!;
+
+    [Inject]
+    private IState<UserState> UserState { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -58,8 +81,33 @@
         LayoutService.SetBaseTheme(_theme);
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AuthenticationStateTask != null)
+        {
+            var authState = await AuthenticationStateTask;
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var userId = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!string.IsNullOrEmpty(userId) && UserState.Value.SelectedUserId != userId)
+                {
+                    Dispatcher.Dispatch(new InvestmentHub.Web.Client.Store.User.SelectUserAction(userId));
+                }
+            }
+        }
+    }
+
     void DrawerToggle()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    private async Task Logout()
+    {
+        await LocalStorage.RemoveItemAsync("authToken");
+        await AuthStateProvider.GetAuthenticationStateAsync();
+        NavigationManager.NavigateTo("/login");
     }
 }

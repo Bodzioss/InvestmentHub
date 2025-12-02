@@ -14,6 +14,7 @@ using InvestmentHub.Domain.Services;
 using InvestmentHub.Domain.Validators;
 using InvestmentHub.Infrastructure.Data;
 using InvestmentHub.Infrastructure.Data.Repositories;
+using InvestmentHub.Infrastructure.Extensions;
 using InvestmentHub.Infrastructure.MarketData;
 using InvestmentHub.Infrastructure.Projections;
 using Marten;
@@ -205,6 +206,39 @@ builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.HistoricalImportJob
 // Add Hangfire services
 builder.Services.AddHangfireServices(builder.Configuration);
 
+// Add Identity
+builder.Services.AddIdentityServices();
+
+// Add Authentication & Authorization
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+            System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+    };
+});
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("PortfolioOwner", policy =>
+        policy.Requirements.Add(new InvestmentHub.API.Authorization.PortfolioOwnerRequirement()));
+});
+
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, InvestmentHub.API.Authorization.PortfolioOwnerHandler>();
+builder.Services.AddScoped<InvestmentHub.API.Services.TokenService>();
+
 var app = builder.Build();
 
 // Log Seq configuration status
@@ -278,6 +312,9 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 
 // Use Hangfire Dashboard
 app.UseHangfireDashboard();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Map controllers
 app.MapControllers();

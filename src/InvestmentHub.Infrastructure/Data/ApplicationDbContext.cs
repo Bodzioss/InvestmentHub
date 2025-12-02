@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using InvestmentHub.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using InvestmentHub.Domain.Entities;
 using InvestmentHub.Domain.ValueObjects;
@@ -8,7 +11,7 @@ namespace InvestmentHub.Infrastructure.Data;
 /// Application database context for InvestmentHub.
 /// Handles all database operations for investment and portfolio entities.
 /// </summary>
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
@@ -16,8 +19,9 @@ public class ApplicationDbContext : DbContext
 
     /// <summary>
     /// Gets or sets the Users DbSet.
+    /// Renamed to DomainUsers to avoid conflict with IdentityDbContext.Users.
     /// </summary>
-    public DbSet<User> Users => Set<User>();
+    public DbSet<User> DomainUsers => Set<User>();
 
     /// <summary>
     /// Gets or sets the Portfolios DbSet.

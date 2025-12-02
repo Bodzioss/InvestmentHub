@@ -79,6 +79,9 @@ public record CreatePortfolioRequest
 
     /// <summary>Gets the owner ID</summary>
     public required string OwnerId { get; init; }
+
+    /// <summary>Gets the portfolio currency</summary>
+    public string Currency { get; init; } = "USD";
 }
 
 /// <summary>

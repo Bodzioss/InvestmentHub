@@ -6,6 +6,7 @@ using Blazored.LocalStorage;
 using Fluxor;
 using Refit;
 using InvestmentHub.Web.Client.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -61,6 +62,10 @@ builder.Services
     .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
 
 builder.Services.AddScoped<LayoutService>();
+
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, InvestmentHub.Web.Client.Auth.CustomAuthenticationStateProvider>();
 
 
 await builder.Build().RunAsync();

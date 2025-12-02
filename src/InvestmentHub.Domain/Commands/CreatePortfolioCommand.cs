@@ -33,22 +33,30 @@ public record CreatePortfolioCommand : IRequest<CreatePortfolioResult>
     public string? Description { get; init; }
 
     /// <summary>
+    /// Gets the portfolio currency.
+    /// </summary>
+    public string Currency { get; init; }
+
+    /// <summary>
     /// Initializes a new instance of the CreatePortfolioCommand class.
     /// </summary>
     /// <param name="portfolioId">The portfolio ID</param>
     /// <param name="ownerId">The owner user ID</param>
     /// <param name="name">The portfolio name</param>
     /// <param name="description">The portfolio description</param>
+    /// <param name="currency">The portfolio currency</param>
     public CreatePortfolioCommand(
         PortfolioId portfolioId,
         UserId ownerId,
         string name,
-        string? description = null)
+        string? description = null,
+        string currency = "USD")
     {
         PortfolioId = portfolioId;
         OwnerId = ownerId;
         Name = name;
         Description = description;
+        Currency = currency;
     }
 }
 

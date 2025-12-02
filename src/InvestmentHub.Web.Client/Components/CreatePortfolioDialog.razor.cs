@@ -5,6 +5,7 @@ using InvestmentHub.Web.Client.Services;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
+using InvestmentHub.Web.Client.Store.Portfolio;
 
 namespace InvestmentHub.Web.Client.Components;
 
@@ -15,6 +16,9 @@ public partial class CreatePortfolioDialog : ComponentBase
 
     [Inject]
     public IState<UserState> UserState { get; set; } = default!;
+
+    [Inject]
+    public IState<PortfolioState> PortfolioState { get; set; } = default!;
 
     [Inject]
     public IDispatcher Dispatcher { get; set; } = default!;
@@ -56,15 +60,19 @@ public partial class CreatePortfolioDialog : ComponentBase
             {
                 Name = _portfolioName,
                 Description = _description,
-                OwnerId = UserState.Value.SelectedUserId
+                OwnerId = UserState.Value.SelectedUserId,
+                Currency = _currency
             };
 
             var portfolio = await ApiErrorHandler.HandleApiCall(() => PortfoliosApi.CreatePortfolioAsync(request));
 
             Snackbar.Add($"Portfolio '{portfolio.Name}' created successfully!", Severity.Success);
 
-            // Reload portfolios for the current user
-            Dispatcher.Dispatch(new LoadPortfoliosAction(UserState.Value.SelectedUserId));
+            // Add the new portfolio to the store directly
+            // This avoids a reload and ensures the UI updates immediately with the correct data
+            var currentPortfolios = new List<PortfolioResponseDto>(PortfolioState.Value.Portfolios);
+            currentPortfolios.Add(portfolio);
+            Dispatcher.Dispatch(new LoadPortfoliosSuccessAction(currentPortfolios));
 
             MudDialog.Close(DialogResult.Ok(portfolio));
         }

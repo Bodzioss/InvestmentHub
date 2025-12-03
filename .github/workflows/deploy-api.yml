@@ -56,12 +56,14 @@ jobs:
           provenance: false
 
       - name: Deploy to Azure Container Apps
-        uses: azure/container-apps-deploy-action@v1
+        uses: azure/cli@v2
         with:
-          acrName: ghcr.io
-          acrUsername: ${{ github.actor }}
-          acrPassword: ${{ secrets.GITHUB_TOKEN }}
-          containerAppName: investmenthub-api
-          resourceGroup: InvestmentHub
-          imageToDeploy: ghcr.io/${{ env.REPO_OWNER }}/investmenthub-api:${{ github.sha }}
-          targetPort: 8080
+          inlineScript: |
+            az config set extension.use_dynamic_install=yes_without_prompt
+            az containerapp update \
+              --name investmenthub-api \
+              --resource-group InvestmentHub \
+              --image ghcr.io/${{ env.REPO_OWNER }}/investmenthub-api:${{ github.sha }} \
+              --registry-server ghcr.io \
+              --registry-username ${{ github.actor }} \
+              --registry-password ${{ secrets.GITHUB_TOKEN }}

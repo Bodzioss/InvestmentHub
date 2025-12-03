@@ -52,7 +52,6 @@ roadmap.md
 NICE_TO_HAVE.md
 
 ## Entity Framework migrations (if not shared)
-migrations/
 
 ## Packages
 *.nupkg

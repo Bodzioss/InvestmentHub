@@ -60,10 +60,17 @@ jobs:
         with:
           inlineScript: |
             az config set extension.use_dynamic_install=yes_without_prompt
+            
+            # Configure registry credentials first
+            az containerapp registry set \
+              --name investmenthub-api \
+              --resource-group InvestmentHub \
+              --server ghcr.io \
+              --username ${{ github.actor }} \
+              --password ${{ secrets.GITHUB_TOKEN }}
+            
+            # Then update the container image
             az containerapp update \
               --name investmenthub-api \
               --resource-group InvestmentHub \
-              --image ghcr.io/${{ env.REPO_OWNER }}/investmenthub-api:${{ github.sha }} \
-              --registry-server ghcr.io \
-              --registry-username ${{ github.actor }} \
-              --registry-password ${{ secrets.GITHUB_TOKEN }}
+              --image ghcr.io/${{ env.REPO_OWNER }}/investmenthub-api:${{ github.sha }}

@@ -24,6 +24,7 @@ public class PortfolioEventsTests
             _ownerId,
             name,
             description,
+            "USD",
             createdAt);
 
         // Assert
@@ -48,6 +49,7 @@ public class PortfolioEventsTests
             _ownerId,
             emptyName,
             null,
+            "USD",
             DateTime.UtcNow);
 
         act.Should().Throw<ArgumentException>()
@@ -146,6 +148,7 @@ public class PortfolioEventsTests
             _ownerId,
             "Test Portfolio",
             null,
+            "USD",
             DateTime.UtcNow);
 
         var renamedEvent = new PortfolioRenamedEvent(

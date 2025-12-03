@@ -151,6 +151,7 @@ public class PortfolioAggregateTests
             ownerId,
             "Initial Name",
             "Initial Description",
+            "USD",
             new DateTime(2025, 1, 1));
 
         var renamedEvent = new PortfolioRenamedEvent(

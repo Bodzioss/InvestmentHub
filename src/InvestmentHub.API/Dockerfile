@@ -24,4 +24,5 @@ RUN dotnet publish "./InvestmentHub.API.csproj" -c $BUILD_CONFIGURATION -o /app/
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+COPY all_instruments_list.json .
 ENTRYPOINT ["dotnet", "InvestmentHub.API.dll"]

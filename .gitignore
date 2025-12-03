@@ -93,6 +93,7 @@ docker-compose.debug.yml
 **/Dockerfile.development
 **/Dockerfile.local
 **/docker-compose.*
+!docker-compose.prod.yml
 .dockerignore
 *.containerignore
 

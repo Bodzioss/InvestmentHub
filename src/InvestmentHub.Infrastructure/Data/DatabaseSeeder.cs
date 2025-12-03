@@ -184,8 +184,16 @@ public static class DatabaseSeeder
         Console.WriteLine("Database seeded successfully with sample data!");
 
         // Import instruments
-        var importer = new InstrumentImporter(context);
-        var instrumentFilePath = Path.Combine("d:\\Github\\InvestmentHub", "all_instruments_list.json");
-        await importer.ImportAsync(instrumentFilePath);
+        // Import instruments
+        var instrumentFilePath = Path.Combine(AppContext.BaseDirectory, "all_instruments_list.json");
+        if (File.Exists(instrumentFilePath))
+        {
+            var importer = new InstrumentImporter(context);
+            await importer.ImportAsync(instrumentFilePath);
+        }
+        else
+        {
+            Console.WriteLine($"Warning: Instrument file not found at {instrumentFilePath}. Skipping import.");
+        }
     }
 }

@@ -26,7 +26,7 @@ public class PortfolioProjectionTests
         var description = "Test Description";
         var createdAt = DateTime.UtcNow;
 
-        var @event = new PortfolioCreatedEvent(portfolioId, ownerId, name, description, createdAt);
+        var @event = new PortfolioCreatedEvent(portfolioId, ownerId, name, description, "USD", createdAt);
 
         // Act
         var readModel = _projection.Create(@event);
@@ -56,7 +56,7 @@ public class PortfolioProjectionTests
         string? description = null;
         var createdAt = DateTime.UtcNow;
 
-        var @event = new PortfolioCreatedEvent(portfolioId, ownerId, name, description, createdAt);
+        var @event = new PortfolioCreatedEvent(portfolioId, ownerId, name, description, "USD", createdAt);
 
         // Act
         var readModel = _projection.Create(@event);
@@ -75,7 +75,7 @@ public class PortfolioProjectionTests
         var newName = "New Name";
         var createdAt = DateTime.UtcNow;
 
-        var createdEvent = new PortfolioCreatedEvent(portfolioId, ownerId, oldName, "Desc", createdAt);
+        var createdEvent = new PortfolioCreatedEvent(portfolioId, ownerId, oldName, "Desc", "USD", createdAt);
         var readModel = _projection.Create(createdEvent);
 
         var renamedEvent = new PortfolioRenamedEvent(portfolioId, oldName, newName, DateTime.UtcNow.AddMinutes(1));
@@ -98,7 +98,7 @@ public class PortfolioProjectionTests
         var name = "Test Portfolio";
         var createdAt = DateTime.UtcNow;
 
-        var createdEvent = new PortfolioCreatedEvent(portfolioId, ownerId, name, "Desc", createdAt);
+        var createdEvent = new PortfolioCreatedEvent(portfolioId, ownerId, name, "Desc", "USD", createdAt);
         var readModel = _projection.Create(createdEvent);
 
         var closedBy = UserId.New();
@@ -125,7 +125,7 @@ public class PortfolioProjectionTests
         var createdAt = DateTime.UtcNow;
 
         // Act - Create
-        var createdEvent = new PortfolioCreatedEvent(portfolioId, ownerId, initialName, "Description", createdAt);
+        var createdEvent = new PortfolioCreatedEvent(portfolioId, ownerId, initialName, "Description", "USD", createdAt);
         var readModel = _projection.Create(createdEvent);
 
         // Act - Rename

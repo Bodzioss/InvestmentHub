@@ -73,4 +73,5 @@ jobs:
             az containerapp update \
               --name investmenthub-api \
               --resource-group InvestmentHub \
+              --ingress-target-port 8080 \
               --image ghcr.io/${{ env.REPO_OWNER }}/investmenthub-api:${{ github.sha }}

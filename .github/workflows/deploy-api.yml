@@ -69,9 +69,14 @@ jobs:
               --username ${{ github.actor }} \
               --password ${{ secrets.GITHUB_TOKEN }}
             
+            # Update ingress target port
+            az containerapp ingress update \
+              --name investmenthub-api \
+              --resource-group InvestmentHub \
+              --target-port 8080
+
             # Then update the container image
             az containerapp update \
               --name investmenthub-api \
               --resource-group InvestmentHub \
-              --ingress-target-port 8080 \
               --image ghcr.io/${{ env.REPO_OWNER }}/investmenthub-api:${{ github.sha }}

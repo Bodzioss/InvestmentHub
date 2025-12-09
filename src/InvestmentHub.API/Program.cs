@@ -130,7 +130,7 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy.WithOrigins("https://purple-rock-0ce25800f.3.azurestaticapps.net", "https://purple-rock-0ce25800f.3.azurestaticapps.net/")
-                  .SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
+                  .SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost" || origin.StartsWith("https://purple-rock-0ce25800f.3.azurestaticapps.net"))
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();

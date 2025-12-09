@@ -14,6 +14,8 @@
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject SignalRService SignalRService
+@implements IAsyncDisposable
 
 <PageTitle>Portfolio Details</PageTitle>
 
@@ -246,20 +248,28 @@ else
     private PortfolioResponseDto? _currentPortfolio;
     private HashSet<string> _fetchedSymbols = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         // Subscribe to state changes
         PortfolioState.StateChanged += (sender, args) => OnStateChanged();
         InvestmentState.StateChanged += (sender, args) => OnInvestmentStateChanged();
         MarketDataState.StateChanged += (sender, args) => StateHasChanged();
+
+        // Start SignalR connection
+        await SignalRService.StartConnectionAsync();
+        SignalRService.OnPortfolioUpdated += HandlePortfolioUpdate;
         
-        base.OnInitialized();
+        await base.OnInitializedAsync();
     }
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         LoadPortfolioAndInvestments();
-        base.OnParametersSet();
+        if (!string.IsNullOrEmpty(PortfolioId) && Guid.TryParse(PortfolioId, out var id))
+        {
+            await SignalRService.JoinPortfolioGroupAsync(id);
+        }
+        await base.OnParametersSetAsync();
     }
 
     private void OnStateChanged()
@@ -436,6 +446,28 @@ else
             "closed" => Color.Default,
             _ => Color.Default
         };
+    }
+    private void HandlePortfolioUpdate(Guid portfolioId, string message)
+    {
+        if (PortfolioId == portfolioId.ToString())
+        {
+            Snackbar.Add(message, Severity.Info);
+            Dispatcher.Dispatch(new LoadInvestmentsAction(PortfolioId));
+            // Also reload portfolio to get updated totals
+            if (!string.IsNullOrEmpty(UserState.Value.SelectedUserId))
+            {
+                Dispatcher.Dispatch(new LoadPortfoliosAction(UserState.Value.SelectedUserId));
+            } 
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!string.IsNullOrEmpty(PortfolioId) && Guid.TryParse(PortfolioId, out var id))
+        {
+            await SignalRService.LeavePortfolioGroupAsync(id);
+        }
+        SignalRService.OnPortfolioUpdated -= HandlePortfolioUpdate;
     }
 }
 

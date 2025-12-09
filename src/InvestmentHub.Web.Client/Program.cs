@@ -62,6 +62,7 @@ builder.Services
     .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
 
 builder.Services.AddScoped<LayoutService>();
+builder.Services.AddScoped<SignalRService>();
 
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();

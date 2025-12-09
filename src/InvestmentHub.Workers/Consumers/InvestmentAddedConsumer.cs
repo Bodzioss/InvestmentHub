@@ -9,11 +9,13 @@ public class InvestmentAddedConsumer : IConsumer<InvestmentAddedMessage>
 {
     private readonly IDocumentSession _session;
     private readonly ILogger<InvestmentAddedConsumer> _logger;
+    private readonly IPublishEndpoint _publishEndpoint;
 
-    public InvestmentAddedConsumer(IDocumentSession session, ILogger<InvestmentAddedConsumer> logger)
+    public InvestmentAddedConsumer(IDocumentSession session, ILogger<InvestmentAddedConsumer> logger, IPublishEndpoint publishEndpoint)
     {
         _session = session;
         _logger = logger;
+        _publishEndpoint = publishEndpoint;
     }
 
     public async Task Consume(ConsumeContext<InvestmentAddedMessage> context)
@@ -66,6 +68,12 @@ public class InvestmentAddedConsumer : IConsumer<InvestmentAddedMessage>
                 _logger.LogInformation("Portfolio {PortfolioId} TotalValue is already up to date ({TotalValue})", 
                     portfolio.Id, portfolio.TotalValue);
             }
+
+            // Notify UI about the update
+            await _publishEndpoint.Publish(new PortfolioUpdatedMessage(
+                message.PortfolioId, 
+                $"Investment {message.Symbol} added to portfolio."
+            ));
         }
         catch (Exception ex)
         {

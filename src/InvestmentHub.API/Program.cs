@@ -3,6 +3,8 @@ using FluentValidation.AspNetCore;
 using HealthChecks.UI.Client;
 using InvestmentHub.API.Extensions;
 using InvestmentHub.API.Mapping;
+using InvestmentHub.API.Hubs;
+using InvestmentHub.API.Consumers;
 using InvestmentHub.API.Middleware;
 using InvestmentHub.Domain.Behaviors;
 using InvestmentHub.Domain.Handlers.Commands;
@@ -136,6 +138,7 @@ builder.Services.AddCors(options =>
 
 // Add API services
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -178,6 +181,8 @@ if (!rabbitMqConnectionString.Contains("@") && rabbitMqConnectionString.StartsWi
 
 builder.Services.AddMassTransit(x =>
 {
+    x.AddConsumer<NotificationConsumer>();
+
     x.UsingRabbitMq((context, cfg) =>
     {
         // Simple configuration - MassTransit will parse the connection string
@@ -239,6 +244,7 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, InvestmentHub.API.Authorization.PortfolioOwnerHandler>();
 builder.Services.AddScoped<InvestmentHub.API.Services.TokenService>();
+builder.Services.AddScoped<INotificationService, InvestmentHub.API.Services.SignalRNotificationService>();
 
 var app = builder.Build();
 
@@ -319,6 +325,7 @@ app.UseAuthorization();
 
 // Map controllers
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();
 

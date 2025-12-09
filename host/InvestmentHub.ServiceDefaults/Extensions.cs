@@ -12,6 +12,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
 
+
 namespace Microsoft.Extensions.Hosting;
 
 // Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
@@ -76,6 +77,7 @@ public static class Extensions
         var isRunningInAspire = !string.IsNullOrWhiteSpace(aspireDashboardEndpoint);
 
         var openTelemetryBuilder = builder.Services.AddOpenTelemetry()
+
             .WithMetrics(metrics =>
             {
                 metrics.AddAspNetCoreInstrumentation()
@@ -132,41 +134,6 @@ public static class Extensions
                     });
                 }
             });
-
-        return builder;
-    }
-
-    private static TBuilder AddOpenTelemetryExporters<TBuilder>(
-        this TBuilder builder, 
-        OpenTelemetryBuilder openTelemetryBuilder) where TBuilder : IHostApplicationBuilder
-    {
-        // In Aspire, when running through AppHost, metrics and traces are automatically exported to Aspire Dashboard.
-        // The Aspire Dashboard OTLP endpoint is automatically configured via environment variables.
-        // We only need to configure OTLP exporter if we want to export to an external endpoint (e.g., Jaeger).
-        
-        var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-        var aspireDashboardEndpoint = builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"];
-        
-        // If running in Aspire (ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL is set), metrics are automatically exported to Dashboard.
-        // We don't need to call UseOtlpExporter() - Aspire handles it automatically.
-        // However, if OTEL_EXPORTER_OTLP_ENDPOINT is also set (for Jaeger), we can export to both.
-        
-        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
-        {
-            // Export to external OTLP endpoint (e.g., Jaeger)
-            // Note: In Aspire, metrics will still go to Dashboard automatically
-            // UseOtlpExporter() will use the endpoint from OTEL_EXPORTER_OTLP_ENDPOINT environment variable
-            // and default to gRPC protocol
-            openTelemetryBuilder.UseOtlpExporter();
-        }
-        // If not in Aspire and no OTLP endpoint is set, OpenTelemetry will use default configuration
-        // (which may not export anywhere, but that's fine for local development)
-
-        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
-        //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
-        //{
-        //    openTelemetryBuilder.UseAzureMonitor();
-        //}
 
         return builder;
     }

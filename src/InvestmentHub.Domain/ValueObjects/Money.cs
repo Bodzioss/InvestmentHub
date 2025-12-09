@@ -6,7 +6,7 @@ namespace InvestmentHub.Domain.ValueObjects;
 /// Represents a monetary amount with currency.
 /// Immutable value object that encapsulates money-related invariants and business rules.
 /// </summary>
-public class Money : IEquatable<Money>
+public sealed class Money : IEquatable<Money>
 {
     /// <summary>
     /// Gets the monetary amount.

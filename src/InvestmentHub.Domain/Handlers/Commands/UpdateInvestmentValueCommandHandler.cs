@@ -103,19 +103,14 @@ public class UpdateInvestmentValueCommandHandler : IRequestHandler<UpdateInvestm
             // 6. Return success with the new total value
             return UpdateInvestmentValueResult.Success(investmentAggregate.CurrentValue);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Update investment value cancelled for {InvestmentId}", request.InvestmentId.Value);
-            // Re-throw cancellation exceptions
-            throw;
-        }
+
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Cannot update investment {InvestmentId}: {Message}", 
                 request.InvestmentId.Value, ex.Message);
             return UpdateInvestmentValueResult.Failure(ex.Message);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to update investment value for {InvestmentId}: {Message}", 
                 request.InvestmentId.Value, ex.Message);

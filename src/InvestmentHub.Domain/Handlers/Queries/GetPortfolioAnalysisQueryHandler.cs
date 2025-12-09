@@ -115,12 +115,8 @@ public class GetPortfolioAnalysisQueryHandler : IRequestHandler<GetPortfolioAnal
 
             return GetPortfolioAnalysisResult.Success(analysisData);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Portfolio analysis cancelled for {PortfolioId}", request.PortfolioId.Value);
-            throw;
-        }
-        catch (Exception ex)
+
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to analyze portfolio {PortfolioId}: {Message}", 
                 request.PortfolioId.Value, ex.Message);

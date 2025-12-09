@@ -224,6 +224,10 @@ public class InMemoryDomainEventPublisherTests
         // Arrange
         var subscriber1 = new MockInvestmentAddedEventSubscriber();
         var subscriber2 = new MockInvestmentAddedEventSubscriber();
+        
+        // Verify initial state
+        _publisher.GetSubscribers<InvestmentAddedEvent>().Should().BeEmpty();
+        
         _publisher.RegisterSubscriber(subscriber1);
         _publisher.RegisterSubscriber(subscriber2);
         
@@ -236,7 +240,7 @@ public class InMemoryDomainEventPublisherTests
         subscribers.Should().Contain(subscriber2);
     }
     
-    private InvestmentAddedEvent CreateInvestmentAddedEvent()
+    private static InvestmentAddedEvent CreateInvestmentAddedEvent()
     {
         var portfolioId = PortfolioId.New();
         var investmentId = InvestmentId.New();

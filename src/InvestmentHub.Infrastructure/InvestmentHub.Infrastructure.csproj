@@ -9,7 +9,10 @@
 
   <ItemGroup>
     <PackageReference Include="Hangfire.Core" Version="1.8.22" />
-    <PackageReference Include="Marten" Version="7.32.3" />
+    <PackageReference Include="Marten" Version="7.33.0" />
+    
+    <!-- Fix for NU1608 -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.11.0" />
     <PackageReference Include="MassTransit" Version="8.5.6" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.0" />

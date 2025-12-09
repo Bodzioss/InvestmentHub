@@ -95,12 +95,8 @@ public class GetInvestmentsQueryHandler : IRequestHandler<GetInvestmentsQuery, G
             // 7. Return success
             return GetInvestmentsResult.Success(investmentSummaries, totalCount);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Get investments query cancelled for portfolio {PortfolioId}", request.PortfolioId.Value);
-            throw;
-        }
-        catch (Exception ex)
+
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to retrieve investments for portfolio {PortfolioId}: {Message}", 
                 request.PortfolioId.Value, ex.Message);

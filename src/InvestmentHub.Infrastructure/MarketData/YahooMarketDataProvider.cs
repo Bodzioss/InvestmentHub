@@ -14,7 +14,6 @@ public class YahooMarketDataProvider : IMarketDataProvider
 {
     private readonly IDistributedCache _cache;
     private readonly ILogger<YahooMarketDataProvider> _logger;
-    private readonly ResiliencePipeline _resiliencePipeline;
     private readonly YahooQuotes _yahooQuotes;
 
     public YahooMarketDataProvider(
@@ -25,7 +24,6 @@ public class YahooMarketDataProvider : IMarketDataProvider
     {
         _cache = cache;
         _logger = logger;
-        _resiliencePipeline = pipelineProvider.GetPipeline("default");
         _yahooQuotes = yahooQuotes;
     }
 

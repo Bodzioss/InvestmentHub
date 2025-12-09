@@ -74,6 +74,16 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
 
             return response;
         }
+        catch (OperationCanceledException)
+        {
+            activity?.SetStatus(ActivityStatusCode.Ok); // Cancellation is not an error
+            activity?.SetTag("cancelled", true);
+            
+#pragma warning disable S6667 // Logging in a catch clause should pass the caught exception as a parameter
+            _logger.LogInformation("{RequestType} {RequestName} was cancelled", requestType, requestName);
+#pragma warning restore S6667 // Logging in a catch clause should pass the caught exception as a parameter
+            throw;
+        }
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
@@ -81,13 +91,6 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
             activity?.SetTag("error.message", ex.Message);
             activity?.SetTag("error.type", ex.GetType().Name);
             
-            _logger.LogError(
-                ex,
-                "Failed {RequestType} {RequestName} with {@Request}",
-                requestType,
-                requestName,
-                request);
-
             throw;
         }
     }

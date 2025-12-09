@@ -27,7 +27,7 @@
     <ProjectReference Include="..\..\src\InvestmentHub.Workers\InvestmentHub.Workers.csproj" />
     
     <!-- 🔧 Service Configuration -->
-    <ProjectReference Include="..\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 
 </Project>

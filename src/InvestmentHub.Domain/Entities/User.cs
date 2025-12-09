@@ -34,6 +34,9 @@ public class User
     {
         // EF Core requires a parameterless constructor
         // Values will be set through properties
+        Id = null!;
+        Name = null!;
+        Email = null!;
     }
 
     /// <summary>

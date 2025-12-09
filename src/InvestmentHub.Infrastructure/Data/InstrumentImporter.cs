@@ -74,7 +74,7 @@ public class InstrumentImporter
         }
     }
 
-    private (AssetType Type, string Exchange) MapGroupToTypeAndExchange(string group)
+    private static (AssetType Type, string Exchange) MapGroupToTypeAndExchange(string group)
     {
         return group switch
         {
@@ -87,13 +87,13 @@ public class InstrumentImporter
         };
     }
 
-    private class RootObject
+    private sealed class RootObject
     {
         [JsonPropertyName("r_")]
         public List<InstrumentItem> Rows { get; set; } = new();
     }
 
-    private class InstrumentItem
+    private sealed class InstrumentItem
     {
         [JsonPropertyName("nazwa")]
         public string Name { get; set; } = string.Empty;

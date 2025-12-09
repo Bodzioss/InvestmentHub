@@ -6,7 +6,7 @@ namespace InvestmentHub.Domain.ValueObjects;
 /// Represents a financial instrument symbol with exchange and asset type information.
 /// Immutable value object that encapsulates symbol-related invariants and business rules.
 /// </summary>
-public class Symbol : IEquatable<Symbol>
+public sealed class Symbol : IEquatable<Symbol>
 {
     /// <summary>
     /// Gets the ticker symbol (e.g., "AAPL", "MSFT").

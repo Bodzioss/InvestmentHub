@@ -31,7 +31,15 @@ public class Instrument
     /// <summary>
     /// Private parameterless constructor for EF Core.
     /// </summary>
-    private Instrument() { }
+    /// <summary>
+    /// Private parameterless constructor for EF Core.
+    /// </summary>
+    private Instrument() 
+    {
+        Symbol = null!;
+        Name = null!;
+        Isin = null!;
+    }
 
     /// <summary>
     /// Initializes a new instance of the Instrument class.

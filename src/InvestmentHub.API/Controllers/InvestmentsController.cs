@@ -158,20 +158,4 @@ public class InvestmentsController : ControllerBase
     //
     // If you need these features, please discuss with the team about proper Event Sourcing patterns.
     // ================================================================================
-
-    /* DISABLED - Event Sourcing Incompatible
-    [HttpDelete("{investmentId}")]
-    public async Task<IActionResult> DeleteInvestment([FromRoute] string investmentId)
-    {
-        return StatusCode(501, new { Error = "Delete is not supported in Event Sourcing. Use 'Sell Investment' instead." });
-    }
-    */
-
-    /* DISABLED - Event Sourcing Incompatible
-    [HttpPut("{investmentId}")]
-    public async Task<IActionResult> UpdateInvestment([FromRoute] string investmentId, [FromBody] UpdateInvestmentRequest request)
-    {
-        return StatusCode(501, new { Error = "Direct updates are not supported in Event Sourcing. Use 'Update Investment Value' instead." });
-    }
-    */
 }

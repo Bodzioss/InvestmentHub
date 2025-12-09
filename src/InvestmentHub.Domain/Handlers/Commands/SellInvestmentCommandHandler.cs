@@ -158,12 +158,7 @@ public class SellInvestmentCommandHandler : IRequestHandler<SellInvestmentComman
                 soldEvent.QuantitySold, 
                 soldEvent.IsCompleteSale);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Sell investment cancelled for {InvestmentId}", request.InvestmentId.Value);
-            // Re-throw cancellation exceptions
-            throw;
-        }
+
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Cannot sell investment {InvestmentId}: {Message}", 
@@ -176,7 +171,7 @@ public class SellInvestmentCommandHandler : IRequestHandler<SellInvestmentComman
                 request.InvestmentId.Value, ex.Message);
             return SellInvestmentResult.Failure(ex.Message);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to sell investment {InvestmentId}: {Message}", 
                 request.InvestmentId.Value, ex.Message);

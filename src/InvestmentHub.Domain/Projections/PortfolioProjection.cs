@@ -60,7 +60,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
     /// </summary>
     /// <param name="model">The current read model</param>
     /// <param name="event">The PortfolioRenamedEvent</param>
-    public void Apply(PortfolioReadModel model, PortfolioRenamedEvent @event)
+    public static void Apply(PortfolioReadModel model, PortfolioRenamedEvent @event)
     {
         model.Name = @event.NewName;
         model.LastUpdated = @event.OccurredOn;
@@ -72,7 +72,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
     /// </summary>
     /// <param name="model">The current read model</param>
     /// <param name="event">The PortfolioClosedEvent</param>
-    public void Apply(PortfolioReadModel model, PortfolioClosedEvent @event)
+    public static void Apply(PortfolioReadModel model, PortfolioClosedEvent @event)
     {
         model.IsClosed = true;
         model.ClosedAt = @event.ClosedAt;
@@ -90,7 +90,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
     /// </summary>
     /// <param name="model">The current portfolio read model</param>
     /// <param name="event">The InvestmentAddedEvent</param>
-    public void Apply(PortfolioReadModel model, InvestmentAddedEvent @event)
+    public static void Apply(PortfolioReadModel model, InvestmentAddedEvent @event)
     {
         // Increment investment count
         model.InvestmentCount++;
@@ -110,7 +110,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
     /// </summary>
     /// <param name="model">The current portfolio read model</param>
     /// <param name="event">The InvestmentValueUpdatedEvent</param>
-    public void Apply(PortfolioReadModel model, InvestmentValueUpdatedEvent @event)
+    public static void Apply(PortfolioReadModel model, InvestmentValueUpdatedEvent @event)
     {
         // Update total value by the delta (NewValue - OldValue)
         var valueDelta = @event.NewValue.Amount - @event.OldValue.Amount;
@@ -127,7 +127,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
     /// </summary>
     /// <param name="model">The current portfolio read model</param>
     /// <param name="event">The InvestmentSoldEvent</param>
-    public void Apply(PortfolioReadModel model, InvestmentSoldEvent @event)
+    public static void Apply(PortfolioReadModel model, InvestmentSoldEvent @event)
     {
         // If complete sale, decrement investment count
         if (@event.IsCompleteSale)

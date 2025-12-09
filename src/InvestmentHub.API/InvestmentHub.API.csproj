@@ -21,7 +21,7 @@
     
     <!-- Additional packages for enhanced functionality -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="9.0.0" />
+
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
@@ -37,6 +37,9 @@
     <PackageReference Include="AspNetCore.HealthChecks.UI" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.UI.InMemory.Storage" Version="9.0.0" />
+    
+    <!-- Fix for NU1608 -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.11.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -45,6 +48,13 @@
     <ProjectReference Include="..\InvestmentHub.Infrastructure\InvestmentHub.Infrastructure.csproj" />
     <ProjectReference Include="..\..\host\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" />
     <ProjectReference Include="..\InvestmentHub.Domain\InvestmentHub.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\all_instruments_list.json">
+      <Link>all_instruments_list.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

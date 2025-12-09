@@ -105,7 +105,7 @@ public class InvestmentAddedEventHandlerTests
             .WithMessage("Mock exception for testing");
     }
     
-    private InvestmentAddedEvent CreateInvestmentAddedEvent()
+    private static InvestmentAddedEvent CreateInvestmentAddedEvent()
     {
         var portfolioId = PortfolioId.New();
         var investmentId = InvestmentId.New();
@@ -144,13 +144,13 @@ public class MockPortfolioValuationService : IPortfolioValuationService
     public async Task<Money> CalculateTotalCostAsync(Portfolio portfolio)
     {
         await Task.CompletedTask;
-        return Money.Zero(Currency.USD);
+        return new Money(1, Currency.USD);
     }
     
     public async Task<Money> CalculateUnrealizedGainLossAsync(Portfolio portfolio)
     {
         await Task.CompletedTask;
-        return Money.Zero(Currency.USD);
+        return new Money(2, Currency.USD);
     }
     
     public async Task<decimal> CalculatePercentageReturnAsync(Portfolio portfolio)
@@ -183,13 +183,13 @@ public class MockPortfolioValuationService : IPortfolioValuationService
         return new PortfolioRiskAnalysis(0, 0, 0, RiskLevel.VeryLow);
     }
     
-    public async Task ProcessEvent(InvestmentAddedEvent eventData)
+    public async Task ProcessEvent(InvestmentAddedEvent investmentAddedEvent)
     {
         if (ShouldThrowException)
             throw new InvalidOperationException("Mock exception for testing");
         
         await Task.CompletedTask;
-        LastProcessedEvent = eventData;
+        LastProcessedEvent = investmentAddedEvent;
         ProcessEventCallCount++;
     }
 }

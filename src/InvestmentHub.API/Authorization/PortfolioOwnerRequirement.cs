@@ -12,12 +12,9 @@ public class PortfolioOwnerRequirement : IAuthorizationRequirement
 public class PortfolioOwnerHandler : AuthorizationHandler<PortfolioOwnerRequirement, Guid>
 {
     private readonly IPortfolioRepository _portfolioRepository;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public PortfolioOwnerHandler(IPortfolioRepository portfolioRepository, IHttpContextAccessor httpContextAccessor)
+    public PortfolioOwnerHandler(IPortfolioRepository portfolioRepository)
     {
         _portfolioRepository = portfolioRepository;
-        _httpContextAccessor = httpContextAccessor;
     }
 
     protected override async Task HandleRequirementAsync(

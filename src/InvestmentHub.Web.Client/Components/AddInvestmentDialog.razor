@@ -251,7 +251,7 @@
                 {
                     Ticker = finalTicker.ToUpper(),
                     Exchange = _exchange.ToUpper(),
-                    AssetType = _assetType
+                    AssetType = _assetType ?? string.Empty
                 },
                 PurchasePrice = new MoneyRequest
                 {

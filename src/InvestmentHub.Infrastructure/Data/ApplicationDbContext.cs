@@ -33,12 +33,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     /// </summary>
     public DbSet<Investment> Investments => Set<Investment>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(builder);
 
         // Configure User entity
-        modelBuilder.Entity<User>(entity =>
+        builder.Entity<User>(entity =>
         {
             entity.ToTable("Users");
             
@@ -67,7 +67,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
         });
 
         // Configure Portfolio entity
-        modelBuilder.Entity<Portfolio>(entity =>
+        builder.Entity<Portfolio>(entity =>
         {
             entity.ToTable("Portfolios");
             
@@ -124,7 +124,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
         });
 
         // Configure Investment entity
-        modelBuilder.Entity<Investment>(entity =>
+        builder.Entity<Investment>(entity =>
         {
             entity.ToTable("Investments");
             
@@ -216,7 +216,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
         });
 
         // Apply all configurations from assembly
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+        builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
     }
 
     /// <summary>

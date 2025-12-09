@@ -19,8 +19,8 @@ public class InstrumentsApiTests : IAsyncLifetime
         .WithImage("rabbitmq:3-management")
         .Build();
 
-    private WebApplicationFactory<Program> _apiFactory;
-    private HttpClient _client;
+    private WebApplicationFactory<Program> _apiFactory = null!;
+    private HttpClient _client = null!;
 
     public async Task InitializeAsync()
     {
@@ -59,9 +59,9 @@ public class InstrumentsApiTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var instruments = await response.Content.ReadFromJsonAsync<List<InstrumentDto>>();
         
-        instruments.Should().NotBeEmpty();
-        instruments!.First().Ticker.Should().Be("AAPL");
-        instruments.First().Name.Should().Be("APPLE");
+        instruments!.Should().NotBeEmpty();
+        instruments![0].Ticker.Should().Be("AAPL");
+        instruments[0].Name.Should().Be("APPLE");
 
         // 2. Filter by AssetType and Exchange
         response = await _client.GetAsync("/api/instruments?assetType=Stock&exchange=GPW");

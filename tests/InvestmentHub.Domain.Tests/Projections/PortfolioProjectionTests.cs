@@ -81,7 +81,7 @@ public class PortfolioProjectionTests
         var renamedEvent = new PortfolioRenamedEvent(portfolioId, oldName, newName, DateTime.UtcNow.AddMinutes(1));
 
         // Act
-        _projection.Apply(readModel, renamedEvent);
+        PortfolioProjection.Apply(readModel, renamedEvent);
 
         // Assert
         readModel.Name.Should().Be(newName);
@@ -107,7 +107,7 @@ public class PortfolioProjectionTests
         var closedEvent = new PortfolioClosedEvent(portfolioId, name, reason, closedAt, closedBy);
 
         // Act
-        _projection.Apply(readModel, closedEvent);
+        PortfolioProjection.Apply(readModel, closedEvent);
 
         // Assert
         readModel.IsClosed.Should().BeTrue();
@@ -130,12 +130,12 @@ public class PortfolioProjectionTests
 
         // Act - Rename
         var renamedEvent = new PortfolioRenamedEvent(portfolioId, initialName, renamedName, createdAt.AddMinutes(5));
-        _projection.Apply(readModel, renamedEvent);
+        PortfolioProjection.Apply(readModel, renamedEvent);
 
         // Act - Close
         var closedBy = UserId.New();
         var closedEvent = new PortfolioClosedEvent(portfolioId, renamedName, "Closing", createdAt.AddMinutes(10), closedBy);
-        _projection.Apply(readModel, closedEvent);
+        PortfolioProjection.Apply(readModel, closedEvent);
 
         // Assert
         readModel.Id.Should().Be(portfolioId.Value);

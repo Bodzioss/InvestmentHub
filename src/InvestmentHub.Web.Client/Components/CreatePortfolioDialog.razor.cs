@@ -5,7 +5,6 @@ using InvestmentHub.Web.Client.Services;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using InvestmentHub.Web.Client.Store.Portfolio;
 
 namespace InvestmentHub.Web.Client.Components;
 

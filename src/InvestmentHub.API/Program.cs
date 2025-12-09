@@ -129,7 +129,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAll",
         policy =>
         {
-            policy.WithOrigins("https://purple-rock-0ce25800f.3.azurestaticapps.net", "https://purple-rock-0ce25800f.3.azurestaticapps.net/", "https://localhost:7213", "http://localhost:5173")
+            policy.WithOrigins("https://purple-rock-0ce25800f.3.azurestaticapps.net", "https://purple-rock-0ce25800f.3.azurestaticapps.net/")
+                  .SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();
@@ -292,20 +293,17 @@ app.UseHttpsRedirection();
 
 // Add Correlation ID middleware first (before other middleware)
 // This ensures Correlation ID is available in all subsequent logs
+// Add Correlation ID middleware first (before other middleware)
+// This ensures Correlation ID is available in all subsequent logs
 app.UseMiddleware<CorrelationIdMiddleware>();
 
 // Add other middleware
 app.UseCors("AllowAll");
 
-// ResponseCompression disabled globally due to .NET 9 TestServer compatibility issues
-// Re-enable in production if needed after verifying test compatibility
-// app.UseResponseCompression();
-
 // Add global exception handler before mapping endpoints
 // This catches all exceptions from controllers and other middleware
 app.UseExceptionHandler();
 
-// Map health check UI (optional - for dashboard)
 app.MapHealthChecksUI(options =>
 {
     options.UIPath = "/healthchecks-ui";
@@ -327,6 +325,9 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 
-app.Run();
+await app.RunAsync();
 
-public partial class Program { }
+public partial class Program
+{
+    protected Program() { }
+}

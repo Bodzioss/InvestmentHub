@@ -54,7 +54,7 @@ public class InvestmentProjection : SingleStreamProjection<InvestmentReadModel>
     /// </summary>
     /// <param name="model">The current read model</param>
     /// <param name="event">The InvestmentValueUpdatedEvent</param>
-    public void Apply(InvestmentReadModel model, InvestmentValueUpdatedEvent @event)
+    public static void Apply(InvestmentReadModel model, InvestmentValueUpdatedEvent @event)
     {
         model.CurrentValue = @event.NewValue.Amount;
         model.LastUpdated = @event.UpdatedAt;
@@ -65,7 +65,7 @@ public class InvestmentProjection : SingleStreamProjection<InvestmentReadModel>
     /// </summary>
     /// <param name="model">The current read model</param>
     /// <param name="event">The InvestmentSoldEvent</param>
-    public void Apply(InvestmentReadModel model, InvestmentSoldEvent @event)
+    public static void Apply(InvestmentReadModel model, InvestmentSoldEvent @event)
     {
         // Update quantity
         model.Quantity -= @event.QuantitySold;

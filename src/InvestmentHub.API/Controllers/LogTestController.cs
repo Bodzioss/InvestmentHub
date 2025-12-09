@@ -14,6 +14,7 @@ public class LogTestController : ControllerBase
     }
 
     [HttpGet("test")]
+    [ProducesResponseType(typeof(object), 200)]
     public IActionResult TestLogs()
     {
         // Test różnych poziomów logowania
@@ -51,6 +52,7 @@ public class LogTestController : ControllerBase
     }
 
     [HttpGet("structured")]
+    [ProducesResponseType(typeof(object), 200)]
     public IActionResult TestStructuredLogging()
     {
         using var scope = _logger.BeginScope("TestScope {TestId}", Guid.NewGuid());

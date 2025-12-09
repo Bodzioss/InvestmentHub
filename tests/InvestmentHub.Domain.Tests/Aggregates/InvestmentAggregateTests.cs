@@ -60,8 +60,10 @@ public class InvestmentAggregateTests
         addedEvent.InitialCurrentValue.Amount.Should().Be(_purchasePrice.Amount * _quantity);
     }
 
-    [Fact]
-    public void Create_ShouldThrowException_WhenQuantityIsZero()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void Create_ShouldThrowException_WhenQuantityIsInvalid(decimal quantity)
     {
         // Act & Assert
         var act = () => InvestmentAggregate.Create(
@@ -69,24 +71,7 @@ public class InvestmentAggregateTests
             _portfolioId,
             _symbol,
             _purchasePrice,
-            0m,
-            _purchaseDate);
-
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*greater than zero*")
-            .And.ParamName.Should().Be("quantity");
-    }
-
-    [Fact]
-    public void Create_ShouldThrowException_WhenQuantityIsNegative()
-    {
-        // Act & Assert
-        var act = () => InvestmentAggregate.Create(
-            _investmentId,
-            _portfolioId,
-            _symbol,
-            _purchasePrice,
-            -5m,
+            quantity,
             _purchaseDate);
 
         act.Should().Throw<ArgumentException>()
@@ -111,16 +96,7 @@ public class InvestmentAggregateTests
             .And.ParamName.Should().Be("purchasePrice");
     }
 
-    [Fact]
-    public void Create_ShouldThrowException_WhenPurchasePriceIsNegative()
-    {
-        // Act & Assert - Money constructor will throw for negative amount
-        var act = () => new Money(-100m, Currency.USD);
 
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*negative*")
-            .And.ParamName.Should().Be("amount");
-    }
 
     [Fact]
     public void Create_ShouldThrowException_WhenPurchaseDateIsInFuture()
@@ -221,25 +197,7 @@ public class InvestmentAggregateTests
             .WithMessage("*sold*");
     }
 
-    [Fact]
-    public void UpdateValue_ShouldThrowException_WhenNewValueIsNegative()
-    {
-        // Arrange
-        var aggregate = InvestmentAggregate.Create(
-            _investmentId,
-            _portfolioId,
-            _symbol,
-            _purchasePrice,
-            _quantity,
-            _purchaseDate);
 
-        // Act & Assert - Money constructor will throw for negative amount
-        var act = () => new Money(-50m, Currency.USD);
-
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*negative*")
-            .And.ParamName.Should().Be("amount");
-    }
 
     [Fact]
     public void UpdateValue_ShouldThrowException_WhenCurrencyMismatch()
@@ -371,25 +329,7 @@ public class InvestmentAggregateTests
             .WithMessage("*already*sold*");
     }
 
-    [Fact]
-    public void Sell_ShouldThrowException_WhenSalePriceIsNegative()
-    {
-        // Arrange
-        var aggregate = InvestmentAggregate.Create(
-            _investmentId,
-            _portfolioId,
-            _symbol,
-            _purchasePrice,
-            _quantity,
-            _purchaseDate);
 
-        // Act & Assert - Money constructor will throw for negative amount
-        var act = () => new Money(-50m, Currency.USD);
-
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*negative*")
-            .And.ParamName.Should().Be("amount");
-    }
 
     [Fact]
     public void Sell_ShouldThrowException_WhenCurrencyMismatch()

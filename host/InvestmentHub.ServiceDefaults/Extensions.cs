@@ -53,11 +53,7 @@ public static class Extensions
         // Add dependency injection services
         builder.AddDependencyInjection();
 
-        // Uncomment the following to restrict the allowed schemes for service discovery.
-        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
-        // {
-        //     options.AllowedSchemes = ["https"];
-        // });
+
 
         return builder;
     }
@@ -76,7 +72,7 @@ public static class Extensions
             ?? builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]; // Fallback for non-Aspire environments
         var isRunningInAspire = !string.IsNullOrWhiteSpace(aspireDashboardEndpoint);
 
-        var openTelemetryBuilder = builder.Services.AddOpenTelemetry()
+        builder.Services.AddOpenTelemetry()
 
             .WithMetrics(metrics =>
             {
@@ -112,8 +108,7 @@ public static class Extensions
                             !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                             && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
                     )
-                    // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
-                    //.AddGrpcClientInstrumentation()
+
                     .AddHttpClientInstrumentation();
                 
                 // Export traces to Aspire Dashboard (if in Aspire)
@@ -267,8 +262,7 @@ public static class Extensions
             });
         }
 
-        // Add response compression
-        // builder.Services.AddResponseCompression();
+
 
         // Add CORS
         builder.Services.AddCors(options =>

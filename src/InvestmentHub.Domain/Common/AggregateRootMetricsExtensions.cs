@@ -23,7 +23,7 @@ public static class AggregateRootMetricsExtensions
         Action<IMetricsRecorder> recordBusinessMetric,
         string projectionType) where T : AggregateRoot
     {
-        var eventCount = aggregate.GetUncommittedEvents().Count();
+        var eventCount = aggregate.GetUncommittedEvents().Count;
         var aggregateType = typeof(T).Name;
 
         // Record business metric (e.g., portfolios.created, investments.added)

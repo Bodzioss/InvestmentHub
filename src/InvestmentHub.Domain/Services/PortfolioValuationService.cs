@@ -184,7 +184,7 @@ public class PortfolioValuationService : IPortfolioValuationService
     /// </summary>
     /// <param name="portfolio">The portfolio to analyze</param>
     /// <returns>Collection of investment performance data</returns>
-    private async Task<IEnumerable<InvestmentPerformance>> GetInvestmentPerformancesAsync(Portfolio portfolio)
+    private static async Task<IEnumerable<InvestmentPerformance>> GetInvestmentPerformancesAsync(Portfolio portfolio)
     {
         var activeInvestments = portfolio.Investments.Where(i => i.Status == InvestmentStatus.Active);
         

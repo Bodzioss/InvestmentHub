@@ -142,7 +142,7 @@
         var dialog = await DialogService.ShowAsync<CreatePortfolioDialog>("Create Portfolio", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result != null && !result.Canceled)
         {
             // Portfolio was created, state will be updated by the dialog
         }

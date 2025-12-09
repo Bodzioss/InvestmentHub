@@ -19,7 +19,7 @@ public class InstrumentImportTests : IAsyncLifetime
         .WithImage("rabbitmq:3-management")
         .Build();
 
-    private WebApplicationFactory<Program> _apiFactory;
+    private WebApplicationFactory<Program> _apiFactory = null!;
 
     public async Task InitializeAsync()
     {
@@ -53,7 +53,7 @@ public class InstrumentImportTests : IAsyncLifetime
     {
         // Act
         // Create client to trigger application startup and seeding
-        var client = _apiFactory.CreateClient();
+        _apiFactory.CreateClient();
         
         // Wait for seeding to complete (it happens synchronously in Program.cs before Run)
         // But we need to access the DbContext to verify

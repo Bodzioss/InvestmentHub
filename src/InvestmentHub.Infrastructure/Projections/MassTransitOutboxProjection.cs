@@ -81,7 +81,7 @@ public class MassTransitOutboxProjection : IProjection
                         break;
 
                     case PortfolioCreatedEvent e:
-                        await publishEndpoint.Publish<PortfolioCreatedMessage>(new
+                        await publishEndpoint.Publish<IPortfolioCreatedMessage>(new
                         {
                             PortfolioId = e.PortfolioId.Value,
                             OwnerId = e.OwnerId.Value,

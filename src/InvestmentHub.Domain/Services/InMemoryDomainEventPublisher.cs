@@ -103,12 +103,14 @@ public class InMemoryDomainEventPublisher : IDomainEventPublisher, IDomainEventR
                 
                 if (handleMethod != null)
                 {
-                    var task = (Task)handleMethod.Invoke(subscriber, new object[] { domainEvent });
-                    return task;
+                    var result = handleMethod.Invoke(subscriber, new object[] { domainEvent });
+                    return result as Task;
                 }
                 
                 return Task.CompletedTask;
-            });
+            })
+            .Where(t => t != null)
+            .Cast<Task>();
             
             await Task.WhenAll(tasks);
         }

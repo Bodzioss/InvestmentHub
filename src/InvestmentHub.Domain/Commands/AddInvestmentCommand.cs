@@ -40,6 +40,11 @@ public record AddInvestmentCommand : IRequest<AddInvestmentResult>
     public DateTime PurchaseDate { get; init; }
 
     /// <summary>
+    /// Gets the investment ID.
+    /// </summary>
+    public InvestmentId InvestmentId { get; init; }
+
+    /// <summary>
     /// Initializes a new instance of the AddInvestmentCommand class.
     /// </summary>
     /// <param name="portfolioId">The portfolio ID</param>
@@ -59,6 +64,7 @@ public record AddInvestmentCommand : IRequest<AddInvestmentResult>
         PurchasePrice = purchasePrice;
         Quantity = quantity;
         PurchaseDate = purchaseDate;
+        InvestmentId = InvestmentId.New();
     }
 }
 
@@ -70,7 +76,10 @@ public record AddInvestmentResult
     /// <summary>
     /// Gets the created investment ID.
     /// </summary>
-    public InvestmentId InvestmentId { get; init; }
+    /// <summary>
+    /// Gets the created investment ID.
+    /// </summary>
+    public InvestmentId InvestmentId { get; init; } = null!;
 
     /// <summary>
     /// Gets a value indicating whether the operation was successful.

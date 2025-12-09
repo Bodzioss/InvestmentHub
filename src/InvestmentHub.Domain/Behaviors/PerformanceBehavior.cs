@@ -79,15 +79,18 @@ public class PerformanceBehavior<TRequest, TResponse> : IPipelineBehavior<TReque
 
             return response;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             _stopwatch.Stop();
             
-            _logger.LogError(
-                "Failed {RequestType} {RequestName} after {ElapsedMilliseconds}ms",
+#pragma warning disable S6667 // Logging in a catch clause should pass the caught exception as a parameter
+            _logger.LogWarning(
+                "Failed {RequestType} {RequestName} after {ElapsedMilliseconds}ms. Error: {ErrorMessage}",
                 requestType,
                 requestName,
-                _stopwatch.ElapsedMilliseconds);
+                _stopwatch.ElapsedMilliseconds,
+                ex.Message);
+#pragma warning restore S6667 // Logging in a catch clause should pass the caught exception as a parameter
             
             throw;
         }

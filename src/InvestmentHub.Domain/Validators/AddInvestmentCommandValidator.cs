@@ -65,7 +65,7 @@ public class AddInvestmentCommandValidator : AbstractValidator<AddInvestmentComm
             .WithMessage("Purchase date is required")
             .LessThanOrEqualTo(DateTime.UtcNow)
             .WithMessage("Purchase date cannot be in the future")
-            .GreaterThan(new DateTime(1900, 1, 1))
+            .GreaterThan(new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc))
             .WithMessage("Purchase date must be after 1900");
     }
 }

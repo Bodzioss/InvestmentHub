@@ -24,47 +24,38 @@ public class PriceUpdateJob
     {
         _logger.LogInformation("Starting PriceUpdateJob...");
 
-        try
+        // 1. Get all unique symbols from active investments
+        // Note: In a real app, we might want a dedicated read model or query for this
+        // to avoid loading all investments. For now, we'll assume the repo has a method
+        // or we fetch all and filter (not ideal for large datasets).
+        // Let's assume we need to add GetActiveSymbolsAsync to IInvestmentRepository first.
+        // For this iteration, I'll use a placeholder logic or we need to extend the repo.
+        
+        // Placeholder: Fetching all investments and getting distinct symbols
+        // This is a temporary solution until we optimize the repository
+        var investments = await _investmentRepository.GetAllAsync(CancellationToken.None);
+        var tickers = investments.Select(i => i.Symbol.Ticker).Distinct().ToList();
+
+        _logger.LogInformation("Found {Count} unique symbols to update", tickers.Count);
+
+        foreach (var ticker in tickers)
         {
-            // 1. Get all unique symbols from active investments
-            // Note: In a real app, we might want a dedicated read model or query for this
-            // to avoid loading all investments. For now, we'll assume the repo has a method
-            // or we fetch all and filter (not ideal for large datasets).
-            // Let's assume we need to add GetActiveSymbolsAsync to IInvestmentRepository first.
-            // For this iteration, I'll use a placeholder logic or we need to extend the repo.
-            
-            // Placeholder: Fetching all investments and getting distinct symbols
-            // This is a temporary solution until we optimize the repository
-            var investments = await _investmentRepository.GetAllAsync(CancellationToken.None);
-            var symbols = investments.Select(i => i.Symbol).Distinct().ToList();
-
-            _logger.LogInformation("Found {Count} unique symbols to update", symbols.Count);
-
-            foreach (var symbol in symbols)
+            try
             {
-                try
+                // 2. Fetch latest price (this will automatically cache it in Redis via the provider)
+                var price = await _marketDataProvider.GetLatestPriceAsync(ticker, CancellationToken.None);
+                
+                if (price != null)
                 {
-                    // 2. Fetch latest price (this will automatically cache it in Redis via the provider)
-                    // Use Ticker for now. In future we might need a mapper from Exchange to Yahoo Suffix.
-                    var price = await _marketDataProvider.GetLatestPriceAsync(symbol.Ticker, CancellationToken.None);
-                    
-                    if (price != null)
-                    {
-                        _logger.LogDebug("Updated price for {Symbol}: {Price} {Currency}", symbol.Ticker, price.Price, price.Currency);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to update price for {Symbol}", symbol.Ticker);
+                    _logger.LogDebug("Updated price for {Symbol}: {Price} {Currency}", ticker, price.Price, price.Currency);
                 }
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update price for {Symbol}", ticker);
+            }
+        }
 
-            _logger.LogInformation("PriceUpdateJob completed successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "PriceUpdateJob failed");
-            throw; // Let Hangfire handle retry
-        }
+        _logger.LogInformation("PriceUpdateJob completed successfully");
     }
 }

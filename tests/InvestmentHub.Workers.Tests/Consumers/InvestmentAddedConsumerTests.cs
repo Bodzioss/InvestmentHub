@@ -33,20 +33,10 @@ public class InvestmentAddedConsumerTests
         // Arrange
         var portfolioId = Guid.NewGuid();
         var investmentId = Guid.NewGuid();
-        var investmentValue = 1000m;
-
         var portfolio = new PortfolioReadModel
         {
             Id = portfolioId,
             TotalValue = 0 // Initial value
-        };
-
-        var investment = new InvestmentReadModel
-        {
-            Id = investmentId,
-            PortfolioId = portfolioId,
-            CurrentValue = investmentValue,
-            Status = Domain.Enums.InvestmentStatus.Active
         };
 
         var mockSession = new Mock<IDocumentSession>();

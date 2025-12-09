@@ -20,7 +20,7 @@ public static class JwtParser
 
         if (roles != null)
         {
-            if (roles.ToString()!.Trim().StartsWith("["))
+            if (roles.ToString()!.Trim().StartsWith('['))
             {
                 var parsedRoles = JsonSerializer.Deserialize<string[]>(roles.ToString()!);
 

@@ -104,7 +104,7 @@ public static class ResilienceExtensions
             options.SetEvaluationTimeInSeconds(
                 configuration.GetValue<int>("HealthChecks:EvaluationIntervalSeconds", 30));
             options.MaximumHistoryEntriesPerEndpoint(50);
-            options.AddHealthCheckEndpoint("InvestmentHub API", "http://localhost:8080/health");
+            options.AddHealthCheckEndpoint("InvestmentHub API", "/health");
         })
         .AddInMemoryStorage();
 

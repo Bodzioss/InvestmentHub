@@ -222,7 +222,7 @@ public class DomainIntegrationTests
         symbol.Exchange.Should().Be("NASDAQ");
     }
     
-    private Portfolio CreateDiversifiedPortfolio()
+    private static Portfolio CreateDiversifiedPortfolio()
     {
         var portfolio = new Portfolio(PortfolioId.New(), "Diversified Portfolio", "Multi-asset portfolio", UserId.New());
         
@@ -237,7 +237,7 @@ public class DomainIntegrationTests
         return portfolio;
     }
     
-    private Investment CreateInvestment(string ticker, string exchange, AssetType assetType, decimal price, decimal quantity)
+    private static Investment CreateInvestment(string ticker, string exchange, AssetType assetType, decimal price, decimal quantity)
     {
         var investmentId = InvestmentId.New();
         var symbol = new Symbol(ticker, exchange, assetType);

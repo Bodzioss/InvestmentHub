@@ -59,13 +59,8 @@ public class GetPortfolioQueryHandler : IRequestHandler<GetPortfolioQuery, GetPo
 
             return GetPortfolioResult.Success(portfolio);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Portfolio query cancelled for {PortfolioId}", request.PortfolioId.Value);
-            // Re-throw cancellation exceptions
-            throw;
-        }
-        catch (Exception ex)
+
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to retrieve portfolio {PortfolioId}: {Message}", 
                 request.PortfolioId.Value, ex.Message);

@@ -66,6 +66,10 @@ public class Portfolio
     {
         // EF Core requires a parameterless constructor
         // Values will be set through properties
+        Id = null!;
+        Name = null!;
+        Description = null!;
+        OwnerId = null!;
     }
     
     /// <summary>
@@ -194,22 +198,16 @@ public class Portfolio
             return Money.Zero(Currency.USD); // Default currency, could be made configurable
         
         var firstInvestment = activeInvestments.First();
-        var totalValue = firstInvestment.CurrentValue;
-        
-        foreach (var investment in activeInvestments.Skip(1))
+        try
         {
-            if (totalValue.Currency == investment.CurrentValue.Currency)
-            {
-                totalValue = totalValue.Add(investment.CurrentValue);
-            }
-            else
-            {
-                // Handle multi-currency portfolios - for now, throw exception
-                throw new InvalidOperationException("Portfolio contains investments in different currencies. Multi-currency support not implemented.");
-            }
+            return activeInvestments.Skip(1)
+                .Select(i => i.CurrentValue)
+                .Aggregate(firstInvestment.CurrentValue, (total, next) => total.Add(next));
         }
-        
-        return totalValue;
+        catch (InvalidOperationException)
+        {
+             throw new InvalidOperationException("Portfolio contains investments in different currencies. Multi-currency support not implemented.");
+        }
     }
     
     /// <summary>

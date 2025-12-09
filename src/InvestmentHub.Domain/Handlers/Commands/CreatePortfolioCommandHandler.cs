@@ -126,18 +126,13 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
                 "PortfolioProjection");
 
             _logger.LogInformation("Successfully created portfolio {PortfolioId} with {EventCount} events", 
-                request.PortfolioId.Value, portfolioAggregate.GetUncommittedEvents().Count());
+                request.PortfolioId.Value, portfolioAggregate.GetUncommittedEvents().Count);
 
             // 7. Return success
             return CreatePortfolioResult.Success(request.PortfolioId);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Portfolio creation cancelled for {PortfolioId}", request.PortfolioId.Value);
-            // Re-throw cancellation exceptions
-            throw;
-        }
-        catch (Exception ex)
+
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to create portfolio {PortfolioId}: {Message}", 
                 request.PortfolioId.Value, ex.Message);

@@ -437,12 +437,12 @@ public class PortfolioTests
         result.Should().Contain("Active");
     }
     
-    private Investment CreateTestInvestment()
+    private static Investment CreateTestInvestment()
     {
         return CreateTestInvestmentWithSymbol("AAPL", "NASDAQ");
     }
     
-    private Investment CreateTestInvestmentWithSymbol(string ticker, string exchange)
+    private static Investment CreateTestInvestmentWithSymbol(string ticker, string exchange)
     {
         var investmentId = InvestmentId.New();
         var symbol = Symbol.Stock(ticker, exchange);

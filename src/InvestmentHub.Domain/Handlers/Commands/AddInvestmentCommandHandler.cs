@@ -147,18 +147,13 @@ public class AddInvestmentCommandHandler : IRequestHandler<AddInvestmentCommand,
                 "InvestmentProjection");
 
             _logger.LogInformation("Successfully added investment {InvestmentId} to portfolio {PortfolioId} with {EventCount} events", 
-                investmentId.Value, request.PortfolioId.Value, investmentAggregate.GetUncommittedEvents().Count());
+                investmentId.Value, request.PortfolioId.Value, investmentAggregate.GetUncommittedEvents().Count);
 
             // 8. Return success
             return AddInvestmentResult.Success(investmentId);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Add investment cancelled for portfolio {PortfolioId}", request.PortfolioId.Value);
-            // Re-throw cancellation exceptions
-            throw;
-        }
-        catch (Exception ex)
+
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to add investment to portfolio {PortfolioId}: {Message}", 
                 request.PortfolioId.Value, ex.Message);

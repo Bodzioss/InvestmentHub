@@ -432,7 +432,7 @@ public class PortfolioValuationServiceTests
         return portfolio;
     }
     
-    private Investment CreateInvestment(string ticker, string exchange, AssetType assetType, decimal price, decimal quantity)
+    private static Investment CreateInvestment(string ticker, string exchange, AssetType assetType, decimal price, decimal quantity)
     {
         var investmentId = InvestmentId.New();
         var symbol = new Symbol(ticker, exchange, assetType);

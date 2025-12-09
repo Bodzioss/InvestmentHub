@@ -151,8 +151,8 @@ public class GetPortfolioQueryHandlerTests
         var portfolioId = PortfolioId.New();
         var query = new GetPortfolioQuery(portfolioId);
 
-        var cancellationTokenSource = new CancellationTokenSource();
-        cancellationTokenSource.Cancel();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
 
         // Act & Assert
         await Assert.ThrowsAsync<OperationCanceledException>(

@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Xunit;
+using InvestmentHub.Workers.Consumers;
+using InvestmentHub.API.Consumers;
+using MassTransit;
 
 namespace InvestmentHub.E2E.Tests;
 
@@ -17,8 +20,8 @@ public class InvestmentFlowTests : IAsyncLifetime
         .WithImage("rabbitmq:3-management")
         .Build();
 
-    private WebApplicationFactory<Program> _apiFactory;
-    private HttpClient _client;
+    private WebApplicationFactory<Program> _apiFactory = null!;
+    private HttpClient _client = null!;
 
     public async Task InitializeAsync()
     {
@@ -40,6 +43,29 @@ public class InvestmentFlowTests : IAsyncLifetime
                     // Use Newtonsoft.Json instead of System.Text.Json to avoid UnflushedBytes error
                     services.AddControllers()
                         .AddNewtonsoftJson();
+
+                    // Re-configure MassTransit to include Worker consumers for E2E testing
+                    // This allows the API process to also act as a Worker, processing events
+                    var massTransitDescriptors = services.Where(d => d.ServiceType.Namespace?.StartsWith("MassTransit") == true).ToList();
+                    foreach (var d in massTransitDescriptors) services.Remove(d);
+
+                    services.AddMassTransit(x =>
+                    {
+                        // API Consumers
+                        x.AddConsumer<NotificationConsumer>();
+                        
+                        // Worker Consumers
+                        x.AddConsumer<InvestmentAddedConsumer>();
+                        x.AddConsumer<InvestmentSoldConsumer>();
+                        x.AddConsumer<PortfolioCreatedConsumer>();
+                        x.AddConsumer<InvestmentValueUpdatedConsumer>();
+
+                        x.UsingRabbitMq((context, cfg) =>
+                        {
+                            cfg.Host(_rabbitmq.GetConnectionString());
+                            cfg.ConfigureEndpoints(context);
+                        });
+                    });
                 });
 
                 builder.ConfigureLogging(logging => 
@@ -70,7 +96,7 @@ public class InvestmentFlowTests : IAsyncLifetime
         usersResponse.EnsureSuccessStatusCode();
         
         var users = await usersResponse.Content.ReadFromJsonAsync<List<UserDto>>();
-        var testUser = users!.First(); // Use first seeded user
+        var testUser = users![0]; // Use first seeded user
         var ownerId = testUser.Id;
 
         // 1. Create Portfolio
@@ -131,8 +157,8 @@ public class InvestmentFlowTests : IAsyncLifetime
         
         investmentResponse.EnsureSuccessStatusCode();
 
-        var investment = await investmentResponse.Content.ReadFromJsonAsync<InvestmentDto>();
-        var investmentId = investment!.Id;
+        await investmentResponse.Content.ReadFromJsonAsync<InvestmentDto>();
+        // var investmentId = investment!.Id; // Unused variable removed
 
         // 3. Verify Investment Created (Immediate Read Model update via API or eventual consistency?)
         // The API likely returns 202 Accepted or 201 Created.
@@ -178,30 +204,30 @@ public class UserDto
     public class AddInvestmentDto
     {
         public Guid PortfolioId { get; set; }
-        public SymbolDto Symbol { get; set; }
-        public MoneyDto PurchasePrice { get; set; }
+        public required SymbolDto Symbol { get; set; }
+        public required MoneyDto PurchasePrice { get; set; }
         public decimal Quantity { get; set; }
         public DateTime PurchaseDate { get; set; }
     }
 
     public class SymbolDto
     {
-        public string Ticker { get; set; }
-        public string Exchange { get; set; }
-        public string AssetType { get; set; }
+        public required string Ticker { get; set; }
+        public required string Exchange { get; set; }
+        public required string AssetType { get; set; }
     }
 
     public class MoneyDto
     {
         public decimal Amount { get; set; }
-        public string Currency { get; set; }
+        public required string Currency { get; set; }
     }
 
 public class PortfolioDto
 {
     public Guid Id { get; set; }
-    public string Name { get; set; }
-    public MoneyDto TotalValue { get; set; }
+    public required string Name { get; set; }
+    public required MoneyDto TotalValue { get; set; }
 }
 
 public class InvestmentDto

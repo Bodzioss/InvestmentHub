@@ -30,7 +30,7 @@ public class SignalRService : IAsyncDisposable
         var token = await _localStorage.GetItemAsync<string>("authToken");
 
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(_navigationManager.ToAbsoluteUri("https://localhost:7213/hubs/notifications"), options => // TODO: Use config for URL
+            .WithUrl(_navigationManager.ToAbsoluteUri("/hubs/notifications"), options => 
             {
                 options.AccessTokenProvider = () => Task.FromResult(token);
             })

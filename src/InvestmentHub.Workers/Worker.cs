@@ -25,7 +25,7 @@ public class Worker : BackgroundService
             // Test różnych poziomów logowania w Worker
             _logger.LogTrace("Worker iteration {Iteration} - Trace level", iteration);
             _logger.LogDebug("Worker iteration {Iteration} - Debug level", iteration);
-            _logger.LogInformation("Worker running at: {time} - Iteration {Iteration}", DateTimeOffset.Now, iteration);
+            _logger.LogInformation("Worker running at: {Time} - Iteration {Iteration}", DateTimeOffset.Now, iteration);
             
             if (iteration % 5 == 0)
             {

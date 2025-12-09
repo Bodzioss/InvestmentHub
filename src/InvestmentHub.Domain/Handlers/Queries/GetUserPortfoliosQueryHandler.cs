@@ -63,8 +63,8 @@ public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQu
                 p.Name,
                 p.Description,
                 new Money(p.TotalValue, Enum.Parse<Currency>(p.Currency)),
-                new Money(0, Enum.Parse<Currency>(p.Currency)), // TotalCost - TODO: calculate from investments
-                new Money(0, Enum.Parse<Currency>(p.Currency)), // UnrealizedGainLoss - TODO: calculate
+                new Money(0, Enum.Parse<Currency>(p.Currency)), 
+                new Money(0, Enum.Parse<Currency>(p.Currency)),
                 p.InvestmentCount,
                 p.CreatedAt,
                 p.LastUpdated
@@ -75,13 +75,8 @@ public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQu
 
             return GetUserPortfoliosResult.Success(portfolioSummaries);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Portfolio query cancelled for user {UserId}", request.UserId.Value);
-            // Re-throw cancellation exceptions
-            throw;
-        }
-        catch (Exception ex)
+
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to retrieve portfolios for user {UserId}: {Message}", 
                 request.UserId.Value, ex.Message);

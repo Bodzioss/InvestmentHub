@@ -47,13 +47,14 @@ var api = builder.AddProject<Projects.InvestmentHub_API>("api")
     .WithEnvironment("RabbitMQ__ConnectionString", rabbitmq.GetEndpoint("rabbitmq-amqp"));
 
 // Add Web Client (Blazor WASM)
-var webClient = builder.AddProject<Projects.InvestmentHub_Web_Client>("webclient")
+// Add Web Client (Blazor WASM)
+builder.AddProject<Projects.InvestmentHub_Web_Client>("webclient")
     .WithReference(api)
     .WithEnvironment("ApiSettings__BaseUrl", api.GetEndpoint("https")) // Pass API URL to frontend
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "https");
 
 // Add Workers service
-var workers = builder.AddProject<Projects.InvestmentHub_Workers>("workers")
+builder.AddProject<Projects.InvestmentHub_Workers>("workers")
     .WithReference(postgres)
     .WithReference(redis)
     .WithEnvironment("DOTNET_LAUNCH_PROFILE", "Workers")
@@ -63,4 +64,4 @@ var workers = builder.AddProject<Projects.InvestmentHub_Workers>("workers")
     // RabbitMQ connection string - using GetEndpoint which Aspire will resolve at runtime
     .WithEnvironment("RabbitMQ__ConnectionString", rabbitmq.GetEndpoint("rabbitmq-amqp"));
 
-builder.Build().Run();
+await builder.Build().RunAsync();

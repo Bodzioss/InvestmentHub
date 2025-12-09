@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InvestmentHub.API\InvestmentHub.API.csproj" />
+    <ProjectReference Include="..\..\src\InvestmentHub.Workers\InvestmentHub.Workers.csproj" />
   </ItemGroup>
 
 </Project>

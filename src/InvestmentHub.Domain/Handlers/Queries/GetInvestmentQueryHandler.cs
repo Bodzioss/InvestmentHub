@@ -69,11 +69,6 @@ public class GetInvestmentQueryHandler : IRequestHandler<GetInvestmentQuery, Get
             _logger.LogInformation("Successfully retrieved investment {InvestmentId}", request.InvestmentId.Value);
             return GetInvestmentResult.Success(investment);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Get investment query cancelled for {InvestmentId}", request.InvestmentId.Value);
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving investment {InvestmentId}: {Message}", 

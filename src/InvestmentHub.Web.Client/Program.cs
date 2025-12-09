@@ -17,7 +17,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // Force HTTPS only (skip HTTP to avoid CORS issues with redirects)
 var apiBaseUrl = builder.Configuration["services:api:https:0"] 
               ?? builder.Configuration["ApiSettings:BaseUrl"]
-              ?? "https://localhost:7213"; // Default fallback to HTTPS
+              ?? throw new InvalidOperationException("API URL is not configured");
 
 Console.WriteLine($"[WebClient] API Base URL: {apiBaseUrl}"); // Debug log
 

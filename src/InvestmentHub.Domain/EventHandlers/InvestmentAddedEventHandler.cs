@@ -57,7 +57,7 @@ public class InvestmentAddedEventHandler : IDomainEventSubscriber<InvestmentAdde
     /// </summary>
     /// <param name="domainEvent">The InvestmentAddedEvent</param>
     /// <returns>A task representing the asynchronous operation</returns>
-    private async Task SimulateValuationUpdateAsync(InvestmentAddedEvent domainEvent)
+    private static async Task SimulateValuationUpdateAsync(InvestmentAddedEvent domainEvent)
     {
         // Simulate async work
         await Task.Delay(100);

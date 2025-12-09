@@ -50,8 +50,8 @@ public class GetUserPortfoliosQueryHandlerTests
         var query = new GetUserPortfoliosQuery(userId);
         var handler = new GetUserPortfoliosQueryHandler(_sessionMock.Object, _loggerMock.Object);
 
-        var cancellationTokenSource = new CancellationTokenSource();
-        cancellationTokenSource.Cancel();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
 
         // Act & Assert
         await Assert.ThrowsAsync<OperationCanceledException>(

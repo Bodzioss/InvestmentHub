@@ -157,7 +157,6 @@ public class RedisTestController : ControllerBase
         {
             _logger.LogInformation("Rozpoczęcie testu wydajności Redis");
             
-            var testResults = new List<object>();
             var startTime = DateTime.UtcNow;
             
             // Test 1: Zapisywanie wielu wartości
@@ -172,7 +171,7 @@ public class RedisTestController : ControllerBase
             var readStart = DateTime.UtcNow;
             for (int i = 1; i <= 100; i++)
             {
-                var value = await _cache.GetStringAsync($"perf-test-{i}");
+                await _cache.GetStringAsync($"perf-test-{i}");
             }
             var readTime = DateTime.UtcNow - readStart;
             

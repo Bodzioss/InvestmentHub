@@ -11,7 +11,7 @@ namespace InvestmentHub.Domain.Examples;
 /// Example demonstrating how domain events work in the InvestmentHub system.
 /// This class shows the complete flow from adding an investment to handling the resulting event.
 /// </summary>
-public class DomainEventExample
+public static class DomainEventExample
 {
     /// <summary>
     /// Demonstrates the complete domain event flow.

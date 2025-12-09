@@ -152,19 +152,19 @@ public class PortfolioAggregateTests
             "Initial Name",
             "Initial Description",
             "USD",
-            new DateTime(2025, 1, 1));
+            new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 
         var renamedEvent = new PortfolioRenamedEvent(
             portfolioId,
             "Initial Name",
             "Updated Name",
-            new DateTime(2025, 2, 1));
+            new DateTime(2025, 2, 1, 0, 0, 0, DateTimeKind.Utc));
 
         var closedEvent = new PortfolioClosedEvent(
             portfolioId,
             "Updated Name",
             "Portfolio completed",
-            new DateTime(2025, 3, 1),
+            new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc),
             ownerId);
 
         // Act - Replay events to rebuild state
@@ -178,8 +178,8 @@ public class PortfolioAggregateTests
         aggregate.Name.Should().Be("Updated Name");
         aggregate.Description.Should().Be("Initial Description");
         aggregate.IsClosed.Should().BeTrue();
-        aggregate.CreatedAt.Should().Be(new DateTime(2025, 1, 1));
-        aggregate.ClosedAt.Should().Be(new DateTime(2025, 3, 1));
+        aggregate.CreatedAt.Should().Be(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        aggregate.ClosedAt.Should().Be(new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc));
         aggregate.CloseReason.Should().Be("Portfolio completed");
         aggregate.Version.Should().Be(3); // 3 events applied
     }

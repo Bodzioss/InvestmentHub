@@ -61,6 +61,11 @@ public class Investment
     {
         // EF Core requires a parameterless constructor
         // Values will be set through properties
+        Id = null!;
+        PortfolioId = null!;
+        Symbol = null!;
+        CurrentValue = null!;
+        PurchasePrice = null!;
     }
 
     /// <summary>

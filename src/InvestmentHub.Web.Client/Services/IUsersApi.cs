@@ -19,5 +19,10 @@ public interface IUsersApi
     /// </summary>
     [Get("/api/users/{id}")]
     Task<UserResponseDto> GetUserByIdAsync(string id);
+    /// <summary>
+    /// Update user
+    /// </summary>
+    [Put("/api/users/{id}")]
+    Task UpdateUserAsync(string id, [Body] InvestmentHub.Contracts.Users.UpdateUserRequest request);
 }
 

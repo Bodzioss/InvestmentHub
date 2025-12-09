@@ -53,4 +53,12 @@ public class User
         Email = email ?? throw new ArgumentNullException(nameof(email));
         CreatedAt = createdAt;
     }
+    /// <summary>
+    /// Updates the user name.
+    /// </summary>
+    /// <param name="name">The new name</param>
+    public void UpdateName(string name)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+    }
 }

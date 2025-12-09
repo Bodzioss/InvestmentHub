@@ -15,17 +15,20 @@ public class AuthController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
+    private readonly Domain.Repositories.IUserRepository _userRepository;
     private readonly TokenService _tokenService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext context,
+        Domain.Repositories.IUserRepository userRepository,
         TokenService tokenService,
         ILogger<AuthController> logger)
     {
         _userManager = userManager;
         _context = context;
+        _userRepository = userRepository;
         _tokenService = tokenService;
         _logger = logger;
     }
@@ -92,7 +95,7 @@ public class AuthController : ControllerBase
         return Ok(new AuthResponse
         {
             Email = user.Email!,
-            Token = _tokenService.CreateToken(user)
+            Token = _tokenService.CreateToken(user, request.Name)
         });
     }
 
@@ -118,12 +121,45 @@ public class AuthController : ControllerBase
             return Unauthorized("Invalid credentials");
         }
 
-        var token = _tokenService.CreateToken(user);
+        // Get domain user to fetch the name
+        var userId = new Domain.ValueObjects.UserId(user.Id);
+        var domainUser = await _userRepository.GetByIdAsync(userId);
+        var userName = domainUser?.Name ?? user.Email!;
+
+        var token = _tokenService.CreateToken(user, userName);
 
         return Ok(new AuthResponse
         {
             Email = user.Email!,
             Token = token
         });
+    }
+    [HttpPost("change-password")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+        {
+            return NotFound("User not found");
+        }
+
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(error.Code, error.Description);
+            }
+            return BadRequest(ModelState);
+        }
+
+        return Ok();
     }
 }

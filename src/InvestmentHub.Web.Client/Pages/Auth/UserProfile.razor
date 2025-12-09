@@ -1,0 +1,78 @@
+@page "/user-profile"
+@using InvestmentHub.Contracts.Users
+@using InvestmentHub.Web.Client.Services
+@using System.Security.Claims
+@inject IUsersApi UsersApi
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Profil użytkownika</MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <MudForm @ref="_form" @bind-IsValid="@_success">
+                <MudTextField T="string" Label="Nazwa" @bind-Value="_model.Name" Required="true" RequiredError="Nazwa jest wymagana" />
+            </MudForm>
+        }
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_success || _loading)" OnClick="Submit">Zapisz zmiany</MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    private UpdateUserRequest _model = new();
+    private bool _success;
+    private bool _loading = true;
+    private MudForm _form = default!;
+    private string _userId = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _userId = user.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            if (!string.IsNullOrEmpty(_userId))
+            {
+                try
+                {
+                    var userData = await UsersApi.GetUserByIdAsync(_userId);
+                    _model.Name = userData.Name;
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Błąd pobierania danych użytkownika: {ex.Message}", Severity.Error);
+                }
+            }
+        }
+        _loading = false;
+    }
+
+    private async Task Submit()
+    {
+        try
+        {
+            await UsersApi.UpdateUserAsync(_userId, _model);
+            Snackbar.Add("Profil zaktualizowany pomyślnie", Severity.Success);
+            // Force refresh to update name in top bar
+            NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd aktualizacji profilu: {ex.Message}", Severity.Error);
+        }
+    }
+}

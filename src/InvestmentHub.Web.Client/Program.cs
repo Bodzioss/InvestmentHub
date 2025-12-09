@@ -63,6 +63,7 @@ builder.Services
 
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<SignalRService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();

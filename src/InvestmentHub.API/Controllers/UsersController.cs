@@ -5,6 +5,7 @@ using InvestmentHub.Domain.ValueObjects;
 using InvestmentHub.Domain.Repositories;
 using AutoMapper;
 using InvestmentHub.Contracts;
+using InvestmentHub.Infrastructure.Data;
 
 namespace InvestmentHub.API.Controllers;
 
@@ -15,6 +16,7 @@ namespace InvestmentHub.API.Controllers;
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {
+    private readonly ApplicationDbContext _context;
     private readonly IUserRepository _userRepository;
     private readonly ILogger<UsersController> _logger;
     private readonly IMapper _mapper;
@@ -23,12 +25,14 @@ public class UsersController : ControllerBase
     /// Initializes a new instance of the UsersController class.
     /// </summary>
     /// <param name="userRepository">The user repository</param>
+    /// <param name="context">The database context</param>
     /// <param name="logger">The logger</param>
     /// <param name="mapper">The AutoMapper instance</param>
-    public UsersController(IUserRepository userRepository, ILogger<UsersController> _logger, IMapper mapper)
+    public UsersController(IUserRepository userRepository, ApplicationDbContext context, ILogger<UsersController> logger, IMapper mapper)
     {
         _userRepository = userRepository;
-        this._logger = _logger;
+        _context = context;
+        _logger = logger;
         _mapper = mapper;
     }
 
@@ -107,6 +111,46 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving user by email {Email}", email);
+            return StatusCode(500, new { Error = "Internal server error" });
+        }
+    }
+    /// <summary>
+    /// Updates a user.
+    /// </summary>
+    /// <param name="userId">The user ID</param>
+    /// <param name="request">The update request</param>
+    /// <returns>No content</returns>
+    [HttpPut("{userId}")]
+    public async Task<IActionResult> UpdateUser([FromRoute] string userId, [FromBody] InvestmentHub.Contracts.Users.UpdateUserRequest request)
+    {
+        // Note: Ideally this should go through MediatR command, but for simplicity we'll update directly via repository/context
+        // However, since we have separate Identity and Domain users, we need to be careful.
+        // For now, we only update the Domain User name.
+        
+        try
+        {
+            var id = UserId.FromString(userId);
+            var user = await _userRepository.GetByIdAsync(id);
+            
+            if (user == null)
+            {
+                return NotFound(new { Error = "User not found" });
+            }
+
+            // Update domain user
+            user.UpdateName(request.Name);
+            
+            // We need to attach the user to context to track changes if it was retrieved via repository that doesn't track
+            // But since we injected context, let's use it to save.
+            // Assuming repository uses the same context instance (scoped).
+            
+            await _context.SaveChangesAsync();
+            
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user {UserId}", userId);
             return StatusCode(500, new { Error = "Internal server error" });
         }
     }

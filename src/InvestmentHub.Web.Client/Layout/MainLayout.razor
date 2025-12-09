@@ -19,8 +19,11 @@
         <MudSpacer />
         <AuthorizeView>
             <Authorized>
-                <MudText Class="mr-4">@context.User.Identity?.Name</MudText>
-                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="Logout">Wyloguj</MudButton>
+                <MudMenu Label="@context.User.Identity?.Name" Variant="Variant.Filled" Color="Color.Secondary" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+                    <MudMenuItem OnClick="@(() => NavigationManager.NavigateTo("/user-profile"))">Zarządzaj kontem</MudMenuItem>
+                    <MudMenuItem OnClick="@(() => NavigationManager.NavigateTo("/change-password"))">Zmień hasło</MudMenuItem>
+                    <MudMenuItem OnClick="Logout">Wyloguj</MudMenuItem>
+                </MudMenu>
             </Authorized>
             <NotAuthorized>
                 <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="@(() => NavigationManager.NavigateTo("/login"))">Logowanie</MudButton>
@@ -107,7 +110,7 @@
     private async Task Logout()
     {
         await LocalStorage.RemoveItemAsync("authToken");
-        await AuthStateProvider.GetAuthenticationStateAsync();
+        ((InvestmentHub.Web.Client.Auth.CustomAuthenticationStateProvider)AuthStateProvider).NotifyUserLogout();
         NavigationManager.NavigateTo("/login");
     }
 }

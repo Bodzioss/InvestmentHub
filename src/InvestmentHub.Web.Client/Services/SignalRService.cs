@@ -8,16 +8,18 @@ public class SignalRService : IAsyncDisposable
 {
     private readonly NavigationManager _navigationManager;
     private readonly ILocalStorageService _localStorage;
+    private readonly IConfiguration _configuration;
     private HubConnection? _hubConnection;
     private bool _started = false;
 
     public event Action<Guid, string>? OnPortfolioUpdated;
     public event Action<string, decimal>? OnPriceUpdated;
 
-    public SignalRService(NavigationManager navigationManager, ILocalStorageService localStorage)
+    public SignalRService(NavigationManager navigationManager, ILocalStorageService localStorage, IConfiguration configuration)
     {
         _navigationManager = navigationManager;
         _localStorage = localStorage;
+        _configuration = configuration;
     }
 
     public async Task StartConnectionAsync()
@@ -28,9 +30,18 @@ public class SignalRService : IAsyncDisposable
         }
 
         var token = await _localStorage.GetItemAsync<string>("authToken");
+        
+        // Use API URL from configuration, similar to Program.cs
+        var apiBaseUrl = _configuration["services:api:https:0"] 
+                      ?? _configuration["ApiSettings:BaseUrl"]
+                      ?? _navigationManager.BaseUri; // Fallback to current origin if not found (though API likely different)
+
+        // Ensure no trailing slash for clean concatenation
+        apiBaseUrl = apiBaseUrl.TrimEnd('/');
+        var hubUrl = $"{apiBaseUrl}/hubs/notifications";
 
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(_navigationManager.ToAbsoluteUri("/hubs/notifications"), options => 
+            .WithUrl(hubUrl, options => 
             {
                 options.AccessTokenProvider = () => Task.FromResult(token);
             })

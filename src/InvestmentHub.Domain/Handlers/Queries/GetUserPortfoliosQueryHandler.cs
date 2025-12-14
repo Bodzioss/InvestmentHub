@@ -48,7 +48,7 @@ public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQu
             
             // Query portfolios for this user from read model
             var portfolios = await _session.Query<PortfolioReadModel>()
-                .Where(p => p.OwnerId == request.UserId.Value)
+                .Where(p => p.OwnerId == request.UserId.Value && !p.IsClosed) // Filter out closed portfolios
                 .ToListAsync(cancellationToken);
 
             if (!portfolios.Any())
@@ -57,18 +57,35 @@ public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQu
                 return GetUserPortfoliosResult.Success(new List<PortfolioSummary>());
             }
 
-            // Convert to summary DTOs
-            var portfolioSummaries = portfolios.Select(p => new PortfolioSummary(
-                new PortfolioId(p.Id),
-                p.Name,
-                p.Description,
-                new Money(p.TotalValue, Enum.Parse<Currency>(p.Currency)),
-                new Money(0, Enum.Parse<Currency>(p.Currency)), 
-                new Money(0, Enum.Parse<Currency>(p.Currency)),
-                p.InvestmentCount,
-                p.CreatedAt,
-                p.LastUpdated
-            )).ToList();
+            // Get all investment read models for these portfolios to calculate totals dynamically
+            var portfolioIds = portfolios.Select(p => p.Id).ToList();
+            var investments = await _session.Query<InvestmentReadModel>()
+                .Where(i => portfolioIds.Contains(i.PortfolioId) && i.Status == InvestmentStatus.Active)
+                .ToListAsync(cancellationToken);
+
+            var portfolioSummaries = new List<PortfolioSummary>();
+
+            foreach (var p in portfolios)
+            {
+                var portfolioInvestments = investments.Where(i => i.PortfolioId == p.Id).ToList();
+                
+                // Calculate totals dynamically from active investments
+                var totalValueAmount = portfolioInvestments.Sum(i => i.CurrentValue);
+                var totalCostAmount = portfolioInvestments.Sum(i => i.PurchasePrice * i.Quantity);
+                var totalGainLossAmount = totalValueAmount - totalCostAmount;
+                
+                portfolioSummaries.Add(new PortfolioSummary(
+                    new PortfolioId(p.Id),
+                    p.Name,
+                    p.Description,
+                    new Money(totalValueAmount, Enum.Parse<Currency>(p.Currency)),
+                    new Money(totalCostAmount, Enum.Parse<Currency>(p.Currency)), 
+                    new Money(Math.Abs(totalGainLossAmount), Enum.Parse<Currency>(p.Currency)), // Gain/Loss magnitude
+                    portfolioInvestments.Count,
+                    p.CreatedAt,
+                    p.LastUpdated
+                ));
+            }
 
             _logger.LogInformation("Successfully retrieved {Count} portfolios for user {UserId}", 
                 portfolioSummaries.Count, request.UserId.Value);

@@ -64,7 +64,7 @@ public class PortfolioAggregate : AggregateRoot
     /// <returns>A new PortfolioAggregate instance with PortfolioCreatedEvent</returns>
     /// <exception cref="ArgumentNullException">Thrown when required parameters are null</exception>
     /// <exception cref="ArgumentException">Thrown when name is empty</exception>
-    public static PortfolioAggregate Create(
+    public static PortfolioAggregate Initiate(
         PortfolioId portfolioId,
         UserId ownerId,
         string name,
@@ -151,6 +151,30 @@ public class PortfolioAggregate : AggregateRoot
         return @event;
     }
 
+    /// <summary>
+    /// Updates the portfolio details (name and description).
+    /// </summary>
+    /// <param name="newName">The new name</param>
+    /// <param name="newDescription">The new description</param>
+    public PortfolioDetailsUpdatedEvent UpdateDetails(string newName, string? newDescription)
+    {
+        if (IsClosed)
+            throw new InvalidOperationException("Cannot update a closed portfolio");
+
+        if (string.IsNullOrWhiteSpace(newName))
+            throw new ArgumentException("New name cannot be empty", nameof(newName));
+
+        var @event = new PortfolioDetailsUpdatedEvent(
+            PortfolioId,
+            newName,
+            newDescription,
+            DateTime.UtcNow);
+
+        Apply(@event);
+        AddDomainEvent(@event);
+        return @event;
+    }
+
     // Apply methods - update state from events (Event Sourcing pattern)
 
     /// <summary>
@@ -192,6 +216,17 @@ public class PortfolioAggregate : AggregateRoot
         IsClosed = true;
         ClosedAt = @event.ClosedAt;
         CloseReason = @event.Reason;
+        Version++;
+    }
+
+    /// <summary>
+    /// Applies a PortfolioDetailsUpdatedEvent to update the details.
+    /// This method is called during event stream replay.
+    /// </summary>
+    public void Apply(PortfolioDetailsUpdatedEvent @event)
+    {
+        Name = @event.NewName;
+        Description = @event.NewDescription;
         Version++;
     }
 

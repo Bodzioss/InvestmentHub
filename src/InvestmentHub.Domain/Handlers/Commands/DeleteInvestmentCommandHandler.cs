@@ -1,99 +1,65 @@
+using InvestmentHub.Domain.Aggregates;
 using InvestmentHub.Domain.Commands;
-using InvestmentHub.Domain.Entities;
-using InvestmentHub.Domain.Enums;
-using InvestmentHub.Domain.ValueObjects;
-using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Domain.ReadModels;
 using MediatR;
+using Marten;
 
 namespace InvestmentHub.Domain.Handlers.Commands;
 
 /// <summary>
 /// Handler for DeleteInvestmentCommand.
-/// Responsible for deleting an investment with full business logic validation.
+/// Responsible for deleting an investment using Event Sourcing with Marten.
 /// </summary>
 public class DeleteInvestmentCommandHandler : IRequestHandler<DeleteInvestmentCommand, DeleteInvestmentResult>
 {
-    private readonly IInvestmentRepository _investmentRepository;
-    private readonly IPortfolioRepository _portfolioRepository;
+    private readonly IDocumentSession _session;
 
-    /// <summary>
-    /// Initializes a new instance of the DeleteInvestmentCommandHandler class.
-    /// </summary>
-    /// <param name="investmentRepository">The investment repository</param>
-    /// <param name="portfolioRepository">The portfolio repository</param>
-    public DeleteInvestmentCommandHandler(
-        IInvestmentRepository investmentRepository,
-        IPortfolioRepository portfolioRepository)
+    public DeleteInvestmentCommandHandler(IDocumentSession session)
     {
-        _investmentRepository = investmentRepository ?? throw new ArgumentNullException(nameof(investmentRepository));
-        _portfolioRepository = portfolioRepository ?? throw new ArgumentNullException(nameof(portfolioRepository));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
     }
 
-    /// <summary>
-    /// Handles the DeleteInvestmentCommand.
-    /// </summary>
-    /// <param name="request">The command request</param>
-    /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns>The result of the operation</returns>
     public async Task<DeleteInvestmentResult> Handle(DeleteInvestmentCommand request, CancellationToken cancellationToken)
     {
         try
         {
-            // Check for cancellation
-            if (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException("Cancellation was requested");
-            }
-
-            // 1. Load investment
-            var investment = await _investmentRepository.GetByIdAsync(request.InvestmentId, cancellationToken);
+            // 1. Load investment aggregate
+            var investment = await _session.Events.AggregateStreamAsync<InvestmentAggregate>(request.InvestmentId.Value, token: cancellationToken);
+            
             if (investment == null)
             {
                 return DeleteInvestmentResult.Failure("Investment not found");
             }
 
-            // 2. Load portfolio to validate access
-            var portfolio = await _portfolioRepository.GetByIdAsync(investment.PortfolioId, cancellationToken);
-            if (portfolio == null)
-            {
-                return DeleteInvestmentResult.Failure("Portfolio not found");
-            }
+            // 2. Validate Portfolio Ownership (Optional but recommended)
+            // We rely on the Investment Aggregate's state.
+            // Command does not contain PortfolioId so we cannot cross-check against request.
 
-            // 3. Check if investment can be deleted
-            if (!request.ForceDelete && investment.Status == InvestmentStatus.Active)
+            // 3. Logic validation (Signifcant value check)
+            if (!request.ForceDelete && investment.Status == InvestmentHub.Domain.Enums.InvestmentStatus.Active)
             {
-                // Check if investment has significant value
-                var totalCost = investment.GetTotalCost();
-                var currentValue = investment.CurrentValue;
-                
-                // If investment has significant value, require force delete
-                if (currentValue.Amount > totalCost.Amount * 0.1m) // More than 10% of cost
-                {
-                    return DeleteInvestmentResult.Failure(
+                 var totalCost = investment.PurchasePrice.Amount * investment.Quantity;
+                 var currentValue = investment.CurrentValue.Amount;
+                 
+                 // If investment has significant value (> 10% of cost), require force delete
+                 if (totalCost > 0 && currentValue > totalCost * 0.1m)
+                 {
+                      return DeleteInvestmentResult.Failure(
                         "Investment has significant value. Use ForceDelete=true to confirm deletion.");
-                }
+                 }
             }
 
-            // 4. Remove investment from portfolio (this will trigger domain events)
-            portfolio.RemoveInvestment(request.InvestmentId);
+            // 4. Perform Delete
+            investment.Delete(request.Reason ?? "Deleted by user");
+            
+            // 5. Append events
+            // We append to the Investment Stream
+            _session.Events.Append(request.InvestmentId.Value, investment.GetUncommittedEvents().ToArray());
+            
+            // 6. Save changes
+            await _session.SaveChangesAsync(cancellationToken);
 
-            // 5. Delete from repository
-            await _investmentRepository.RemoveAsync(request.InvestmentId, cancellationToken);
-            await _portfolioRepository.UpdateAsync(portfolio, cancellationToken);
-
-            // 6. Log deletion reason if provided
-            if (!string.IsNullOrEmpty(request.Reason))
-            {
-                Console.WriteLine($"Investment {request.InvestmentId} deleted. Reason: {request.Reason}");
-            }
-
-            // 7. Return success
             return DeleteInvestmentResult.Success(request.InvestmentId);
-        }
-        catch (OperationCanceledException)
-        {
-            // Re-throw cancellation exceptions
-            throw;
         }
         catch (Exception ex)
         {

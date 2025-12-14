@@ -22,6 +22,7 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
         // Configure identity for portfolio events - use PortfolioId from event
         Identity<PortfolioCreatedEvent>(e => e.PortfolioId.Value);
         Identity<PortfolioRenamedEvent>(e => e.PortfolioId.Value);
+        Identity<PortfolioDetailsUpdatedEvent>(e => e.PortfolioId.Value);
         Identity<PortfolioClosedEvent>(e => e.PortfolioId.Value);
         
         // Configure identity for investment events - use PortfolioId from event
@@ -63,6 +64,14 @@ public class PortfolioProjection : MultiStreamProjection<PortfolioReadModel, Gui
     public static void Apply(PortfolioReadModel model, PortfolioRenamedEvent @event)
     {
         model.Name = @event.NewName;
+        model.LastUpdated = @event.OccurredOn;
+        model.AggregateVersion = @event.Version;
+    }
+
+    public static void Apply(PortfolioReadModel model, PortfolioDetailsUpdatedEvent @event)
+    {
+        model.Name = @event.NewName;
+        model.Description = @event.NewDescription;
         model.LastUpdated = @event.OccurredOn;
         model.AggregateVersion = @event.Version;
     }

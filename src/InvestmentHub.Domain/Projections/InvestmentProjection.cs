@@ -95,5 +95,13 @@ public class InvestmentProjection : SingleStreamProjection<InvestmentReadModel>
         
         model.LastUpdated = @event.OccurredOn;
     }
+    /// <summary>
+    /// Deletes the read model when investment is deleted.
+    /// Returns null to signal Marten to delete the document.
+    /// </summary>
+    public InvestmentReadModel? Apply(InvestmentReadModel model, InvestmentDeletedEvent @event)
+    {
+        return null;
+    }
 }
 

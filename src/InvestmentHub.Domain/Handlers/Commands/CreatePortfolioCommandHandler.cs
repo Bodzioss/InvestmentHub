@@ -97,7 +97,7 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
             }
 
             // 4. Create portfolio aggregate (generates PortfolioCreatedEvent)
-            var portfolioAggregate = PortfolioAggregate.Create(
+            var portfolioAggregate = PortfolioAggregate.Initiate(
                 request.PortfolioId,
                 request.OwnerId,
                 request.Name,

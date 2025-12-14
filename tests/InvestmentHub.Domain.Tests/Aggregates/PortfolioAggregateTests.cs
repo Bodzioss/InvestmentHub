@@ -19,7 +19,7 @@ public class PortfolioAggregateTests
         var description = "Test portfolio";
 
         // Act
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, name, description);
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, name, description);
 
         // Assert
         aggregate.Should().NotBeNull();
@@ -37,7 +37,7 @@ public class PortfolioAggregateTests
     public void Create_ShouldThrowException_WhenNameIsEmpty()
     {
         // Act & Assert
-        var act = () => PortfolioAggregate.Create(_portfolioId, _ownerId, "");
+        var act = () => PortfolioAggregate.Initiate(_portfolioId, _ownerId, "");
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("*name*");
@@ -47,7 +47,7 @@ public class PortfolioAggregateTests
     public void Rename_ShouldGeneratePortfolioRenamedEvent_AndUpdateName()
     {
         // Arrange
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, "Old Name");
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, "Old Name");
         var newName = "New Name";
 
         // Act
@@ -67,7 +67,7 @@ public class PortfolioAggregateTests
     {
         // Arrange
         var sameName = "Same Name";
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, sameName);
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, sameName);
 
         // Act & Assert
         var act = () => aggregate.Rename(sameName);
@@ -80,7 +80,7 @@ public class PortfolioAggregateTests
     public void Rename_ShouldThrowException_WhenPortfolioIsClosed()
     {
         // Arrange
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, "Portfolio");
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, "Portfolio");
         aggregate.Close("Closing for test", _ownerId);
 
         // Act & Assert
@@ -94,7 +94,7 @@ public class PortfolioAggregateTests
     public void Close_ShouldGeneratePortfolioClosedEvent_AndMarkAsClosed()
     {
         // Arrange
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, "Portfolio");
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, "Portfolio");
         var reason = "No longer needed";
 
         // Act
@@ -114,7 +114,7 @@ public class PortfolioAggregateTests
     public void Close_ShouldAcceptNullReason()
     {
         // Arrange
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, "Portfolio");
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, "Portfolio");
 
         // Act
         var @event = aggregate.Close(null, _ownerId);
@@ -129,7 +129,7 @@ public class PortfolioAggregateTests
     public void Close_ShouldThrowException_WhenAlreadyClosed()
     {
         // Arrange
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, "Portfolio");
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, "Portfolio");
         aggregate.Close("First close", _ownerId);
 
         // Act & Assert
@@ -188,7 +188,7 @@ public class PortfolioAggregateTests
     public void EventSourcing_ShouldHandleMultipleRenames()
     {
         // Arrange
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, "Name 1");
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, "Name 1");
 
         // Act
         aggregate.Rename("Name 2");
@@ -204,7 +204,7 @@ public class PortfolioAggregateTests
     public void ToString_ShouldReturnMeaningfulRepresentation()
     {
         // Arrange
-        var aggregate = PortfolioAggregate.Create(_portfolioId, _ownerId, "Test Portfolio");
+        var aggregate = PortfolioAggregate.Initiate(_portfolioId, _ownerId, "Test Portfolio");
 
         // Act
         var result = aggregate.ToString();

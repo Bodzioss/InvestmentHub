@@ -212,6 +212,25 @@ public class InvestmentAggregate : AggregateRoot
         AddDomainEvent(@event);
     }
 
+    /// <summary>
+    /// Deletes the investment (removes it from portfolio).
+    /// Generates an InvestmentDeletedEvent.
+    /// </summary>
+    /// <param name="reason">Reason for deletion</param>
+    public void Delete(string reason)
+    {
+        // No checks on Status - user can delete active or sold investment if they want to remove history
+        
+        var @event = new InvestmentDeletedEvent(
+            InvestmentId,
+            PortfolioId,
+            reason,
+            DateTime.UtcNow);
+            
+        Apply(@event);
+        AddDomainEvent(@event);
+    }
+
     // Apply methods - update state from events (Event Sourcing pattern)
 
     /// <summary>
@@ -274,8 +293,15 @@ public class InvestmentAggregate : AggregateRoot
             // Recalculate current value for remaining quantity using stored value per unit
             CurrentValue = new Money(valuePerUnit * Quantity, CurrentValue.Currency);
         }
-        
         LastUpdated = @event.OccurredOn;
+        Version++;
+    }
+
+    /// <summary>
+    /// Applies an InvestmentDeletedEvent.
+    /// </summary>
+    public void Apply(InvestmentDeletedEvent @event)
+    {
         Version++;
     }
 

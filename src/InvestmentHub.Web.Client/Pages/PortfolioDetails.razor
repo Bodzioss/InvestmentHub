@@ -15,6 +15,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject SignalRService SignalRService
+@inject IPortfoliosApi PortfoliosApi
 @implements IAsyncDisposable
 
 <PageTitle>Portfolio Details</PageTitle>
@@ -48,23 +49,65 @@ else
                         </div>
                     </MudStack>
                 </div>
-                <MudButton Variant="Variant.Filled" 
-                          Color="Color.Primary" 
-                          StartIcon="@Icons.Material.Filled.Add"
-                          OnClick="OpenAddInvestmentDialog">
-                    Add Investment
-                </MudButton>
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" 
+                              Color="Color.Primary" 
+                              StartIcon="@Icons.Material.Filled.Edit"
+                              OnClick="OpenEditPortfolioDialog">
+                        Edit
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" 
+                              Color="Color.Error" 
+                              StartIcon="@Icons.Material.Filled.Delete"
+                              OnClick="DeletePortfolio">
+                        Delete
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" 
+                              Color="Color.Primary" 
+                              StartIcon="@Icons.Material.Filled.Add"
+                              OnClick="OpenAddInvestmentDialog">
+                        Add Investment
+                    </MudButton>
+                </MudStack>
             </MudStack>
         </MudPaper>
 
         <!-- Portfolio Summary Cards -->
+        @{
+            // Compute totals dynamically based on current investments and market prices
+            decimal totalValue = 0;
+            decimal totalCost = 0;
+            decimal gainLoss = 0;
+            string currency = _currentPortfolio.Currency;
+            
+            if (InvestmentState.Value.Investments.Any())
+            {
+                foreach (var inv in InvestmentState.Value.Investments)
+                {
+                    totalCost += inv.PurchasePrice.Amount * inv.Quantity;
+                    
+                    var marketPrice = GetMarketPrice(inv.Symbol.Ticker);
+                    if (marketPrice != null)
+                    {
+                        totalValue += marketPrice.Price * inv.Quantity;
+                    }
+                    else
+                    {
+                        totalValue += inv.CurrentValue.Amount; // Fallback to last known value
+                    }
+                }
+                
+                gainLoss = totalValue - totalCost;
+            }
+        }
+        
         <MudGrid Class="mb-4">
             <MudItem xs="12" sm="6" md="3">
                 <MudCard Elevation="1">
                     <MudCardContent>
                         <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Value</MudText>
                         <MudText Typo="Typo.h5" Color="Color.Primary">
-                            @(_currentPortfolio.TotalValue?.Amount.ToString("N2") ?? "0.00") @(_currentPortfolio.TotalValue?.Currency ?? "USD")
+                            @totalValue.ToString("N2") @currency
                         </MudText>
                     </MudCardContent>
                 </MudCard>
@@ -74,7 +117,7 @@ else
                     <MudCardContent>
                         <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Cost</MudText>
                         <MudText Typo="Typo.h5">
-                            @(_currentPortfolio.TotalCost?.Amount.ToString("N2") ?? "0.00") @(_currentPortfolio.TotalCost?.Currency ?? "USD")
+                            @totalCost.ToString("N2") @currency
                         </MudText>
                     </MudCardContent>
                 </MudCard>
@@ -83,8 +126,8 @@ else
                 <MudCard Elevation="1">
                     <MudCardContent>
                         <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Gain/Loss</MudText>
-                        <MudText Typo="Typo.h5" Color="@GetGainLossColor(_currentPortfolio.UnrealizedGainLoss?.Amount ?? 0)">
-                            @(_currentPortfolio.UnrealizedGainLoss?.Amount.ToString("N2") ?? "0.00") @(_currentPortfolio.UnrealizedGainLoss?.Currency ?? "USD")
+                        <MudText Typo="Typo.h5" Color="@GetGainLossColor(gainLoss)">
+                            @gainLoss.ToString("N2") @currency
                         </MudText>
                     </MudCardContent>
                 </MudCard>
@@ -395,6 +438,80 @@ else
         
         var dialog = await DialogService.ShowAsync<PriceHistoryDialog>($"Price History: {investment.Symbol.Ticker}", parameters, options);
         await dialog.Result;
+    }
+
+    private async Task OpenEditPortfolioDialog()
+    {
+        if (_currentPortfolio == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "PortfolioId", PortfolioId },
+            { "Name", _currentPortfolio.Name },
+            { "Description", _currentPortfolio.Description ?? string.Empty }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true, 
+            MaxWidth = MaxWidth.Medium, 
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<EditPortfolioDialog>("Edit Portfolio", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UpdatePortfolioRequest request)
+        {
+            try 
+            {
+                await PortfoliosApi.UpdatePortfolioAsync(PortfolioId, request);
+                Snackbar.Add("Portfolio updated successfully", Severity.Success);
+                // Reload portfolio to show changes
+                Dispatcher.Dispatch(new LoadPortfoliosAction(UserState.Value.SelectedUserId));
+            }
+            catch (Refit.ApiException ex)
+            {
+                var error = await ex.GetContentAsAsync<Dictionary<string, string>>();
+                var message = error != null && error.ContainsKey("error") ? error["error"] : ex.Message;
+                Snackbar.Add($"Failed to update portfolio: {message}", Severity.Error);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Failed to update portfolio: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeletePortfolio()
+    {
+        if (_currentPortfolio == null) return;
+
+        var result = await DialogService.ShowMessageBox(
+            "Delete Portfolio",
+            $"Are you sure you want to delete portfolio '{_currentPortfolio.Name}'? This action cannot be undone.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (result == true)
+        {
+            try
+            {
+                await PortfoliosApi.DeletePortfolioAsync(PortfolioId);
+                Snackbar.Add("Portfolio deleted successfully", Severity.Success);
+                NavigationManager.NavigateTo("/");
+            }
+            catch (Refit.ApiException ex)
+            {
+                var error = await ex.GetContentAsAsync<Dictionary<string, string>>();
+                var message = error != null && error.ContainsKey("error") ? error["error"] : ex.Message;
+                Snackbar.Add($"Failed to delete portfolio: {message}", Severity.Error);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Failed to delete portfolio: {ex.Message}", Severity.Error);
+            }
+        }
     }
 
     private async Task DeleteInvestment(InvestmentResponseDto investment)

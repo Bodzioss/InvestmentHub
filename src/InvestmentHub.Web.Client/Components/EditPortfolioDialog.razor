@@ -1,0 +1,25 @@
+@using InvestmentHub.Contracts
+@using InvestmentHub.Web.Client.Services
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="Name" Label="Portfolio Name" Required="true" RequiredError="Name is required" />
+        <MudTextField @bind-Value="Description" Label="Description" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save Changes</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string PortfolioId { get; set; } = string.Empty;
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+
+    void Submit() => MudDialog.Close(DialogResult.Ok(new UpdatePortfolioRequest { PortfolioId = PortfolioId, Name = Name, Description = Description }));
+    void Cancel() => MudDialog.Cancel();
+}

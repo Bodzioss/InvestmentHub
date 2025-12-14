@@ -87,7 +87,8 @@
                                     Variant="Variant.Outlined" 
                                     Format="N2"
                                     Adornment="Adornment.Start"
-                                    AdornmentText="@_currency" />
+                                    AdornmentText="@_currency"
+                                    HelperText="@(_isFetchingPrice ? "Fetching latest price..." : null)" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
@@ -160,9 +161,13 @@
     [Inject]
     private IInvestmentsApi InvestmentsApi { get; set; } = null!;
 
+    [Inject]
+    private IMarketDataApi MarketDataApi { get; set; } = null!;
+
     private MudForm _form = null!;
     private bool _isValid;
     private bool _isSubmitting;
+    private bool _isFetchingPrice;
 
     // Symbol fields
     private InstrumentDto? _selectedInstrument;
@@ -204,10 +209,18 @@
 
     private void OnInstrumentSelected(InstrumentDto instrument)
     {
-        if (instrument == null) return;
-
         _selectedInstrument = instrument;
+        
+        if (instrument == null) 
+        {
+            _ticker = string.Empty;
+            return;
+        }
+
         _ticker = instrument.Ticker;
+        
+        // Fire and forget price fetch
+        _ = FetchLatestPrice(_ticker);
         
         // Auto-populate other fields if they match or are empty
         if (!string.IsNullOrEmpty(instrument.Exchange))
@@ -230,6 +243,49 @@
             return exchanges;
             
         return exchanges.Where(x => x.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    private async Task FetchLatestPrice(string ticker)
+    {
+        if (string.IsNullOrWhiteSpace(ticker)) return;
+
+        _isFetchingPrice = true;
+        StateHasChanged();
+
+        try
+        {
+            var priceData = await MarketDataApi.GetPriceAsync(ticker);
+            if (priceData != null)
+            {
+                _purchasePrice = priceData.Price;
+                
+                // Sanitize currency (e.g., handle "USD=X" -> "USD")
+                var rawCurrency = priceData.Currency?.ToUpper() ?? "USD";
+                if (rawCurrency.Contains("=X"))
+                {
+                   // If it's something like "USD=X", take "USD"
+                   _currency = rawCurrency.Replace("=X", "").Trim();
+                }
+                else if (rawCurrency.Length > 3)
+                {
+                    // Fallback: take first 3 chars if it looks like a standard code with garbage
+                    _currency = rawCurrency.Substring(0, 3);
+                }
+                else 
+                {
+                    _currency = rawCurrency;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to fetch price for {ticker}: {ex.Message}");
+        }
+        finally
+        {
+            _isFetchingPrice = false;
+            StateHasChanged();
+        }
     }
 
     private async Task Submit()

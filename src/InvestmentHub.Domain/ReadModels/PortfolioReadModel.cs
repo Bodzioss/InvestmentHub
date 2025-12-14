@@ -55,6 +55,12 @@ public class PortfolioReadModel
     /// This is calculated from investment events.
     /// </summary>
     public decimal TotalValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the total cost of all investments in the portfolio.
+    /// Used to calculate identifying unrealized gain/loss.
+    /// </summary>
+    public decimal TotalCost { get; set; }
     
     /// <summary>
     /// Gets or sets the currency of the total value.

@@ -40,26 +40,34 @@ builder.Services.AddFluxor(options =>
     // Note: Redux DevTools requires browser extension - optional for development
 });
 
+// Register Auth Header Handler
+builder.Services.AddTransient<InvestmentHub.Web.Client.Auth.AuthHeaderHandler>();
+
 // Refit API clients
 builder.Services
     .AddRefitClient<InvestmentHub.Web.Client.Services.IUsersApi>()
-    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<InvestmentHub.Web.Client.Auth.AuthHeaderHandler>();
 
 builder.Services
     .AddRefitClient<InvestmentHub.Web.Client.Services.IPortfoliosApi>()
-    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<InvestmentHub.Web.Client.Auth.AuthHeaderHandler>();
 
 builder.Services
     .AddRefitClient<InvestmentHub.Web.Client.Services.IInvestmentsApi>()
-    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<InvestmentHub.Web.Client.Auth.AuthHeaderHandler>();
 
 builder.Services
     .AddRefitClient<InvestmentHub.Web.Client.Services.IMarketDataApi>()
-    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<InvestmentHub.Web.Client.Auth.AuthHeaderHandler>();
 
 builder.Services
     .AddRefitClient<InvestmentHub.Web.Client.Services.IInstrumentsApi>()
-    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl));
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<InvestmentHub.Web.Client.Auth.AuthHeaderHandler>();
 
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<SignalRService>();

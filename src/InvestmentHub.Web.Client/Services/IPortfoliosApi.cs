@@ -30,7 +30,7 @@ public interface IPortfoliosApi
     /// Update portfolio
     /// </summary>
     [Put("/api/portfolios/{id}")]
-    Task<PortfolioResponseDto> UpdatePortfolioAsync(string id, [Body] UpdatePortfolioRequest request);
+    Task UpdatePortfolioAsync(string id, [Body] UpdatePortfolioRequest request);
 
     /// <summary>
     /// Delete portfolio

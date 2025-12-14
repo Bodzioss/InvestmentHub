@@ -59,7 +59,8 @@ public class PortfoliosController : ControllerBase
                     TotalValue = new MoneyResponseDto { Amount = 0, Currency = request.Currency },
                     TotalCost = new MoneyResponseDto { Amount = 0, Currency = request.Currency },
                     UnrealizedGainLoss = new MoneyResponseDto { Amount = 0, Currency = request.Currency },
-                    ActiveInvestmentCount = 0
+                    ActiveInvestmentCount = 0,
+                    Currency = request.Currency
                 };
 
                 return CreatedAtAction(
@@ -103,7 +104,7 @@ public class PortfoliosController : ControllerBase
                     Name = p.Name,
                     Description = p.Description,
                     OwnerId = userId, // Use the userId from route parameter
-                    CreatedDate = p.CreatedAt,
+                    CreatedDate = p.CreatedAt, // Fix: Map from CreatedAt to CreatedDate
                     LastUpdated = p.LastUpdated,
                     TotalValue = new MoneyResponseDto
                     {
@@ -120,7 +121,8 @@ public class PortfoliosController : ControllerBase
                         Amount = p.UnrealizedGainLoss.Amount,
                         Currency = p.UnrealizedGainLoss.Currency.ToString()
                     },
-                    ActiveInvestmentCount = p.ActiveInvestmentCount
+                    ActiveInvestmentCount = p.ActiveInvestmentCount,
+                    Currency = p.TotalValue.Currency.ToString()
                 }).ToList();
                 return Ok(response);
             }
@@ -154,7 +156,33 @@ public class PortfoliosController : ControllerBase
 
             if (result.IsSuccess && result.Portfolio != null)
             {
-                var response = _mapper.Map<PortfolioResponseDto>(result.Portfolio);
+                var p = result.Portfolio;
+                var response = new PortfolioResponseDto
+                {
+                    Id = p.Id.ToString(),
+                    Name = p.Name,
+                    Description = p.Description,
+                    OwnerId = p.OwnerId.ToString(),
+                    CreatedDate = p.CreatedAt,
+                    LastUpdated = p.LastUpdated,
+                    TotalValue = new MoneyResponseDto
+                    {
+                        Amount = p.TotalValue,
+                        Currency = p.Currency
+                    },
+                    TotalCost = new MoneyResponseDto
+                    {
+                         Amount = 0, // TODO
+                         Currency = p.Currency
+                    },
+                    UnrealizedGainLoss = new MoneyResponseDto
+                    {
+                         Amount = 0, // TODO
+                         Currency = p.Currency
+                    },
+                    ActiveInvestmentCount = p.InvestmentCount,
+                    Currency = p.Currency
+                };
                 return Ok(response);
             }
 
@@ -168,6 +196,83 @@ public class PortfoliosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving portfolio {PortfolioId}", portfolioId);
+            return StatusCode(500, new { Error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Updates portfolio details.
+    /// </summary>
+    /// <param name="id">The portfolio ID</param>
+    /// <param name="request">The update request</param>
+    /// <returns>No content</returns>
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateDetails([FromRoute] string id, [FromBody] UpdatePortfolioRequest request)
+    {
+        if (id != request.PortfolioId)
+        {
+            return BadRequest(new { Error = "Portfolio ID mismatch" });
+        }
+
+        try
+        {
+            var command = new UpdatePortfolioDetailsCommand(
+                PortfolioId.FromString(id),
+                request.Name ?? string.Empty,
+                request.Description
+            );
+
+            var result = await _mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                return NoContent();
+            }
+
+            return BadRequest(new { Error = result.ErrorMessage });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating portfolio {PortfolioId}", id);
+            return StatusCode(500, new { Error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Deletes a portfolio.
+    /// </summary>
+    /// <param name="id">The portfolio ID</param>
+    /// <returns>No content</returns>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete([FromRoute] string id)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+            if (userIdClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            var userId = UserId.FromString(userIdClaim.Value);
+
+            var command = new DeletePortfolioCommand(
+                PortfolioId.FromString(id),
+                userId
+            );
+
+            var result = await _mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                return NoContent();
+            }
+
+            return BadRequest(new { Error = result.ErrorMessage });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting portfolio {PortfolioId}", id);
             return StatusCode(500, new { Error = "Internal server error" });
         }
     }

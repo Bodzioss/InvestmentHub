@@ -143,7 +143,7 @@ public class InvestmentMappingProfile : Profile
             }))
             .ForMember(dest => dest.TotalCost, opt => opt.MapFrom(src => new MoneyResponseDto
             {
-                Amount = 0, // Not yet calculated in read model
+                Amount = src.TotalCost,
                 Currency = src.Currency
             }))
             .ForMember(dest => dest.UnrealizedGainLoss, opt => opt.MapFrom(src => new MoneyResponseDto

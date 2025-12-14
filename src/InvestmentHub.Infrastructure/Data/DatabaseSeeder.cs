@@ -14,7 +14,7 @@ public static class DatabaseSeeder
     /// Seeds the database with initial data.
     /// </summary>
     /// <param name="context">The database context</param>
-    public static async Task SeedAsync(ApplicationDbContext context)
+    public static async Task SeedAsync(ApplicationDbContext context, YahooQuotesApi.YahooQuotes yahooQuotes)
     {
         // Apply pending migrations
         // NOTE: If this fails with "relation already exists", it means the database was created with EnsureCreatedAsync previously.
@@ -26,6 +26,15 @@ public static class DatabaseSeeder
         {
             return; // Data already seeded
         }
+
+        // ... (rest of seeding logic is fine, just need to update the end) ...
+        
+        // I need to use replace_file_content carefully or use multi_replace for start and end.
+        // Let's just do two replacements or use view_file to be sure of line numbers?
+        // I have view_file output from earlier.
+        
+        // Wait, I can't put the whole file in ReplacementContent.
+        // I'll do two separate tool calls or one multi_replace_file_content
 
         // Create sample users
         var users = new List<User>
@@ -185,15 +194,25 @@ public static class DatabaseSeeder
 
         // Import instruments
         // Import instruments
+        // Import GPW instruments
         var instrumentFilePath = Path.Combine(AppContext.BaseDirectory, "all_instruments_list.json");
+        var importer = new InstrumentImporter(context, yahooQuotes);
+
         if (File.Exists(instrumentFilePath))
         {
-            var importer = new InstrumentImporter(context);
             await importer.ImportAsync(instrumentFilePath);
         }
         else
         {
-            Console.WriteLine($"Warning: Instrument file not found at {instrumentFilePath}. Skipping import.");
+            Console.WriteLine($"Warning: GPW Instrument file not found at {instrumentFilePath}. Skipping import.");
+        }
+
+        // Import Global instruments if validated file exists
+        var globalInstrumentFilePath = Path.Combine(AppContext.BaseDirectory, "valid_global_instruments.json");
+        if (File.Exists(globalInstrumentFilePath))
+        {
+            Console.WriteLine("Importing Global Instruments...");
+            await importer.ImportGlobalAsync(globalInstrumentFilePath);
         }
     }
 }

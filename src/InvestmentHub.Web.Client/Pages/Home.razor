@@ -9,101 +9,153 @@
 @inject IDispatcher Dispatcher
 @inject NavigationManager NavigationManager
 @inject MudBlazor.IDialogService DialogService
+@inject IPortfoliosApi PortfoliosApi
+@inject ISnackbar Snackbar
 
 <PageTitle>Dashboard</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large">
-    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+@if (UserState.Value.SelectedUserId == null)
+{
+    <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-16">
+        <MudStack Spacing="8" AlignItems="AlignItems.Center" Class="mb-16">
+            <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Large" Color="Color.Primary" Style="font-size: 6rem;" />
+            <MudText Typo="Typo.h2" Align="Align.Center" Color="Color.Primary" GutterBottom="true">InvestmentHub</MudText>
+            <MudText Typo="Typo.h5" Align="Align.Center" Color="Color.Secondary">Smart Portfolio Management & Real-time Tracking</MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Style="max-width: 600px;">
+                Manage all your investments in one place. Track stocks, analyze performance, and make data-driven decisions with our comprehensive analytical tools.
+            </MudText>
+        </MudStack>
 
-    @if (UserState.Value.SelectedUserId == null)
-    {
-        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="my-2">
-            Please select a user from the top menu to view portfolios.
-        </MudAlert>
-    }
-    else if (PortfolioState.Value.IsLoading)
-    {
-        <MudGrid>
-            @for (int i = 0; i < 3; i++)
-            {
-                <MudItem xs="12" sm="6" md="4">
-                    <MudCard>
-                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px"/>
-                        <MudCardContent>
-                            <MudSkeleton Width="30%" Height="42px;" />
-                            <MudSkeleton Width="80%" />
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
-            }
-        </MudGrid>
-    }
-    else if (!PortfolioState.Value.Portfolios.Any())
-    {
-        <MudPaper Class="pa-16 ma-2" Elevation="0" Outlined="true">
-            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
-                <MudIcon Icon="@Icons.Material.Filled.WorkOutline" Size="Size.Large" Color="Color.Default" />
-                <MudText Typo="Typo.h5">No portfolios found</MudText>
-                <MudText Typo="Typo.body1" Class="mb-4">Create your first investment portfolio to get started.</MudText>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreatePortfolioDialog">Create Portfolio</MudButton>
-            </MudStack>
-        </MudPaper>
-    }
-    else
-    {
-        <MudGrid>
-            @foreach (var portfolio in PortfolioState.Value.Portfolios)
-            {
-                <MudItem xs="12" sm="6" md="4">
-                    <MudCard Elevation="3" Class="hover-card">
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.h6">@portfolio.Name</MudText>
-                                <MudText Typo="Typo.caption">Created: @portfolio.CreatedDate.ToShortDateString()</MudText>
-                            </CardHeaderContent>
-                            <CardHeaderActions>
-                                <MudIconButton Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Default" Href="@($"/portfolio/{portfolio.Id}")" />
-                            </CardHeaderActions>
-                        </MudCardHeader>
-                        <MudCardContent>
-                            <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-2">
-                                @(portfolio.TotalValue?.Amount.ToString("N2") ?? "0.00") @(portfolio.TotalValue?.Currency ?? "USD")
-                            </MudText>
-                            
-                            <MudStack Row="true" Spacing="4">
-                                <div>
-                                    <MudText Typo="Typo.caption">Investments</MudText>
-                                    <MudText Typo="Typo.body2">@portfolio.ActiveInvestmentCount</MudText>
-                                </div>
-                                <div>
-                                    <MudText Typo="Typo.caption">Gain/Loss</MudText>
-                                    <MudText Typo="Typo.body2" Color="@(GetGainLossColor(portfolio.UnrealizedGainLoss?.Amount ?? 0))">
-                                        @(portfolio.UnrealizedGainLoss?.Amount.ToString("N2") ?? "0.00")
-                                    </MudText>
-                                </div>
-                            </MudStack>
-                        </MudCardContent>
-                        <MudCardActions>
-                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/portfolio/{portfolio.Id}")">View Details</MudButton>
-                        </MudCardActions>
-                    </MudCard>
-                </MudItem>
-            }
-            
-            <!-- Add Portfolio Card -->
-            <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="0" Outlined="true" Class="d-flex align-center justify-center hover-card" Style="height: 100%; min-height: 200px; cursor: pointer;" @onclick="OpenCreatePortfolioDialog">
-                    <MudCardContent>
-                        <MudStack AlignItems="AlignItems.Center">
-                            <MudIcon Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Large" Color="Color.Secondary" />
-                            <MudText Typo="Typo.h6" Color="Color.Secondary">Create New Portfolio</MudText>
-                        </MudStack>
-                    </MudCardContent>
-                </MudCard>
+        <MudGrid Class="mt-8" Spacing="4">
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="0" Class="pa-6 d-flex flex-column align-center gap-4 h-100" Outlined="true">
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6">1. Login</MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center">
+                        Log in to your account from the top menu to access your personal dashboard.
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                 <MudPaper Elevation="0" Class="pa-6 d-flex flex-column align-center gap-4 h-100" Outlined="true">
+                    <MudAvatar Color="Color.Secondary" Variant="Variant.Filled" Size="Size.Large">
+                        <MudIcon Icon="@Icons.Material.Filled.Work" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6">2. Create Portfolios</MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center">
+                        Organize your assets into different portfolios to track specific strategies or goals.
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                 <MudPaper Elevation="0" Class="pa-6 d-flex flex-column align-center gap-4 h-100" Outlined="true">
+                    <MudAvatar Color="Color.Tertiary" Variant="Variant.Filled" Size="Size.Large">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6">3. Track Growth</MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center">
+                        Monitor real-time value changes, analyze gains, and optimize your investment strategy.
+                    </MudText>
+                </MudPaper>
             </MudItem>
         </MudGrid>
-    }
-</MudContainer>
+    </MudContainer>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+    
+        @if (PortfolioState.Value.IsLoading)
+        {
+            <MudGrid>
+                @for (int i = 0; i < 3; i++)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard>
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px"/>
+                            <MudCardContent>
+                                <MudSkeleton Width="30%" Height="42px;" />
+                                <MudSkeleton Width="80%" />
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+        else if (!PortfolioState.Value.Portfolios.Any())
+        {
+            <MudPaper Class="pa-16 ma-2" Elevation="0" Outlined="true">
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.WorkOutline" Size="Size.Large" Color="Color.Default" />
+                    <MudText Typo="Typo.h5">No portfolios found</MudText>
+                    <MudText Typo="Typo.body1" Class="mb-4">Create your first investment portfolio to get started.</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreatePortfolioDialog">Create Portfolio</MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <MudGrid>
+                @foreach (var portfolio in PortfolioState.Value.Portfolios)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard Elevation="3" Class="hover-card">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">@portfolio.Name</MudText>
+                                    <MudText Typo="Typo.caption">Created: @portfolio.CreatedDate.ToShortDateString()</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                                        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" Href="@($"/portfolio/{portfolio.Id}")">View Details</MudMenuItem>
+                                        <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="@(() => OpenEditPortfolioDialog(portfolio))">Edit</MudMenuItem>
+                                        <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeletePortfolio(portfolio))" IconColor="Color.Error">Delete</MudMenuItem>
+                                    </MudMenu>
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-2">
+                                    @(portfolio.TotalValue?.Amount.ToString("N2") ?? "0.00") @(portfolio.TotalValue?.Currency ?? "USD")
+                                </MudText>
+                                
+                                <MudStack Row="true" Spacing="4">
+                                    <div>
+                                        <MudText Typo="Typo.caption">Investments</MudText>
+                                        <MudText Typo="Typo.body2">@portfolio.ActiveInvestmentCount</MudText>
+                                    </div>
+                                    <div>
+                                        <MudText Typo="Typo.caption">Gain/Loss</MudText>
+                                        <MudText Typo="Typo.body2" Color="@(GetGainLossColor(portfolio.UnrealizedGainLoss?.Amount ?? 0))">
+                                            @(portfolio.UnrealizedGainLoss?.Amount.ToString("N2") ?? "0.00")
+                                        </MudText>
+                                    </div>
+                                </MudStack>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/portfolio/{portfolio.Id}")">View Details</MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+                
+                <!-- Add Portfolio Card -->
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="0" Outlined="true" Class="d-flex align-center justify-center hover-card" Style="height: 100%; min-height: 200px; cursor: pointer;" @onclick="OpenCreatePortfolioDialog">
+                        <MudCardContent>
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Large" Color="Color.Secondary" />
+                                <MudText Typo="Typo.h6" Color="Color.Secondary">Create New Portfolio</MudText>
+                            </MudStack>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudContainer>
+}
 
 <style>
     .hover-card {
@@ -145,6 +197,83 @@
         if (result != null && !result.Canceled)
         {
             // Portfolio was created, state will be updated by the dialog
+        }
+    }
+
+    private async Task OpenEditPortfolioDialog(PortfolioResponseDto portfolio)
+    {
+        var parameters = new DialogParameters
+        {
+            { "PortfolioId", portfolio.Id },
+            { "Name", portfolio.Name },
+            { "Description", portfolio.Description ?? string.Empty }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true, 
+            MaxWidth = MaxWidth.Medium, 
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<EditPortfolioDialog>("Edit Portfolio", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UpdatePortfolioRequest request)
+        {
+            try 
+            {
+                await PortfoliosApi.UpdatePortfolioAsync(portfolio.Id, request);
+                Snackbar.Add("Portfolio updated successfully", Severity.Success);
+                // Reload portfolios
+                if (UserState.Value.SelectedUserId != null)
+                {
+                    Dispatcher.Dispatch(new LoadPortfoliosAction(UserState.Value.SelectedUserId));
+                }
+            }
+            catch (Refit.ApiException ex)
+            {
+                var error = await ex.GetContentAsAsync<Dictionary<string, string>>();
+                var message = error != null && error.ContainsKey("error") ? error["error"] : ex.Message;
+                Snackbar.Add($"Failed to update portfolio: {message}", Severity.Error);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Failed to update portfolio: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeletePortfolio(PortfolioResponseDto portfolio)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Delete Portfolio",
+            $"Are you sure you want to delete portfolio '{portfolio.Name}'? This action cannot be undone.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (result == true)
+        {
+            try
+            {
+                await PortfoliosApi.DeletePortfolioAsync(portfolio.Id);
+                Snackbar.Add("Portfolio deleted successfully", Severity.Success);
+                // Reload portfolios
+                if (UserState.Value.SelectedUserId != null)
+                {
+                    Dispatcher.Dispatch(new LoadPortfoliosAction(UserState.Value.SelectedUserId));
+                }
+            }
+            catch (Refit.ApiException ex)
+            {
+                var error = await ex.GetContentAsAsync<Dictionary<string, string>>();
+                var message = error != null && error.ContainsKey("error") ? error["error"] : ex.Message;
+                Snackbar.Add($"Failed to delete portfolio: {message}", Severity.Error);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Failed to delete portfolio: {ex.Message}", Severity.Error);
+            }
         }
     }
 

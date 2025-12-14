@@ -67,6 +67,9 @@ public class PortfolioResponseDto
 
     /// <summary>Gets or sets the active investment count</summary>
     public int ActiveInvestmentCount { get; set; }
+
+    /// <summary>Gets or sets the portfolio currency</summary>
+    public string Currency { get; set; } = "USD";
 }
 
 /// <summary>

@@ -54,6 +54,15 @@ public class GetPortfolioQueryHandler : IRequestHandler<GetPortfolioQuery, GetPo
                 return GetPortfolioResult.Failure("Portfolio not found");
             }
 
+            // Calculate totals from InvestmentReadModels to ensure accuracy
+            var investments = await _session.Query<InvestmentReadModel>()
+                .Where(x => x.PortfolioId == request.PortfolioId.Value && x.Status == InvestmentHub.Domain.Enums.InvestmentStatus.Active)
+                .ToListAsync(cancellationToken);
+
+            portfolio.TotalValue = investments.Sum(x => x.CurrentValue);
+            portfolio.TotalCost = investments.Sum(x => x.TotalCost);
+            portfolio.InvestmentCount = investments.Count;
+
             _logger.LogInformation("Successfully retrieved portfolio {PortfolioId} (Version: {Version})", 
                 portfolio.Id, portfolio.AggregateVersion);
 

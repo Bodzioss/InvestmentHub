@@ -14,6 +14,7 @@ public class YahooMarketDataProvider : IMarketDataProvider
 {
     private readonly IDistributedCache _cache;
     private readonly ILogger<YahooMarketDataProvider> _logger;
+    private readonly ResiliencePipeline _pipeline;
     private readonly YahooQuotes _yahooQuotes;
 
     public YahooMarketDataProvider(
@@ -25,6 +26,7 @@ public class YahooMarketDataProvider : IMarketDataProvider
         _cache = cache;
         _logger = logger;
         _yahooQuotes = yahooQuotes;
+        _pipeline = pipelineProvider.GetPipeline("default");
     }
 
     public async Task<MarketPrice?> GetLatestPriceAsync(string symbol, CancellationToken cancellationToken = default)
@@ -40,8 +42,9 @@ public class YahooMarketDataProvider : IMarketDataProvider
 
         try
         {
-            // Fetch from Yahoo using YahooQuotesApi
-            var security = await _yahooQuotes.GetSnapshotAsync(symbol, cancellationToken);
+            // Fetch from Yahoo using YahooQuotesApi with resilience
+            var security = await _pipeline.ExecuteAsync(async token => 
+                await _yahooQuotes.GetSnapshotAsync(symbol, token), cancellationToken);
 
             if (security == null)
             {
@@ -55,11 +58,17 @@ public class YahooMarketDataProvider : IMarketDataProvider
             // But maybe we should check if it is valid?
             // Let's assume it is valid if we got the security.
             
+            var currency = security.Currency.ToString() ?? "USD";
+            if (currency.EndsWith("=X"))
+            {
+                currency = currency.Replace("=X", "");
+            }
+
             var price = new MarketPrice
             {
                 Symbol = symbol,
                 Price = security.RegularMarketPrice,
-                Currency = security.Currency.ToString() ?? "USD",
+                Currency = currency,
                 Timestamp = DateTime.UtcNow,
                 Source = "Yahoo"
             };

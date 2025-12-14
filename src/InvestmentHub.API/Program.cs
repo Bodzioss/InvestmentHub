@@ -88,6 +88,7 @@ builder.Services.AddMarten(sp =>
     var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
     options.Projections.Add(new MassTransitOutboxProjection(scopeFactory), ProjectionLifecycle.Async);
     options.Projections.Add<InvestmentProjection>(ProjectionLifecycle.Inline);
+    options.Projections.Add<PortfolioProjection>(ProjectionLifecycle.Inline);
     return options;
 })
 .UseLightweightSessions()
@@ -209,6 +210,7 @@ builder.Services.AddScoped<IMarketDataProvider, YahooMarketDataProvider>();
 // Add Background Jobs
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.PriceUpdateJob>();
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.HistoricalImportJob>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.Data.InstrumentImporter>();
 
 // Add Hangfire services
 builder.Services.AddHangfireServices(builder.Configuration);
@@ -278,7 +280,8 @@ else
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await DatabaseSeeder.SeedAsync(context);
+    var yahooQuotes = scope.ServiceProvider.GetRequiredService<YahooQuotesApi.YahooQuotes>();
+    await DatabaseSeeder.SeedAsync(context, yahooQuotes);
 }
 
 // Configure the HTTP request pipeline.

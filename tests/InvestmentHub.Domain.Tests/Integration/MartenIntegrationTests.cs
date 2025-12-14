@@ -89,7 +89,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         var description = "Integration Test";
 
         // Act - Create aggregate and save events
-        var aggregate = PortfolioAggregate.Create(portfolioId, ownerId, name, description);
+        var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, name, description);
         
         session.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
@@ -123,7 +123,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         var description = "Testing projection";
 
         // Act - Create portfolio via event stream
-        var aggregate = PortfolioAggregate.Create(portfolioId, ownerId, name, description);
+        var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, name, description);
         
         session.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
@@ -214,7 +214,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         var ownerId = UserId.New();
         var initialName = "Original Name";
         
-        var aggregate = PortfolioAggregate.Create(portfolioId, ownerId, initialName, "Description");
+        var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, initialName, "Description");
         
         session.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
@@ -267,7 +267,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
         
-        var aggregate = PortfolioAggregate.Create(portfolioId, ownerId, "Test Portfolio", "Description");
+        var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Test Portfolio", "Description");
         
         session.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
@@ -321,7 +321,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         var ownerId = UserId.New();
         
         // Create
-        var aggregate = PortfolioAggregate.Create(portfolioId, ownerId, "Initial Name", "Description");
+        var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Initial Name", "Description");
         session.Events.StartStream<PortfolioAggregate>(portfolioId.Value, aggregate.GetUncommittedEvents().ToArray());
         await session.SaveChangesAsync();
 
@@ -468,7 +468,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         await using var portfolioSession = _documentStore!.LightweightSession();
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
-        var portfolioAggregate = PortfolioAggregate.Create(portfolioId, ownerId, "Test Portfolio");
+        var portfolioAggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Test Portfolio");
         
         portfolioSession.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
@@ -638,7 +638,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         await using var portfolioSession = _documentStore!.LightweightSession();
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
-        var portfolioAggregate = PortfolioAggregate.Create(portfolioId, ownerId, "Integration Portfolio");
+        var portfolioAggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Integration Portfolio");
         
         portfolioSession.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,

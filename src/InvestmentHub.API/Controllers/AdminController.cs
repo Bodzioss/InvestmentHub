@@ -1,5 +1,6 @@
 using InvestmentHub.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace InvestmentHub.API.Controllers;
 
@@ -101,5 +102,50 @@ public class AdminController : ControllerBase
         {
             return StatusCode(500, new { Error = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Import GPW instruments directly.
+    /// </summary>
+    [HttpPost("import-gpw")]
+    public async Task<IActionResult> ImportGpw()
+    {
+        var sourceFile = Path.Combine(AppContext.BaseDirectory, "all_instruments_list.json");
+        
+        if (!System.IO.File.Exists(sourceFile))
+        {
+            return NotFound($"GPW instruments file not found at {sourceFile}");
+        }
+
+        try
+        {
+            await _importer.ImportAsync(sourceFile);
+            return Ok(new { Message = "GPW instruments imported successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get status of instrument files and database count.
+    /// </summary>
+    [HttpGet("instruments-status")]
+    public async Task<IActionResult> GetInstrumentsStatus([FromServices] ApplicationDbContext context)
+    {
+        var count = await context.Instruments.CountAsync();
+        var gpwFilePath = Path.Combine(AppContext.BaseDirectory, "all_instruments_list.json");
+        var globalFilePath = Path.Combine(AppContext.BaseDirectory, "valid_global_instruments.json");
+
+        return Ok(new
+        {
+            InstrumentCount = count,
+            GpwFileExists = System.IO.File.Exists(gpwFilePath),
+            GpwFilePath = gpwFilePath,
+            GlobalFileExists = System.IO.File.Exists(globalFilePath),
+            GlobalFilePath = globalFilePath,
+            BaseDirectory = AppContext.BaseDirectory
+        });
     }
 }

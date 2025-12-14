@@ -130,13 +130,14 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAll",
         policy =>
         {
-            policy.WithOrigins("https://purple-rock-0ce25800f.3.azurestaticapps.net", "https://purple-rock-0ce25800f.3.azurestaticapps.net/")
-                  .SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost" || origin.StartsWith("https://purple-rock-0ce25800f.3.azurestaticapps.net"))
+            policy.SetIsOriginAllowed(_ => true) // Allow any origin, robust matching
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();
         });
 });
+
+// Add API services
 
 // Add API services
 builder.Services.AddControllers();
@@ -199,7 +200,7 @@ builder.Services.AddMassTransit(x =>
 });
 
 // Add health checks for infrastructure dependencies
-builder.Services.AddInfrastructureHealthChecks(builder.Configuration);
+builder.Services.AddInfrastructureHealthChecks(builder.Configuration, builder.Environment);
 
 // Register YahooQuotes service
 builder.Services.AddSingleton(new YahooQuotesBuilder().Build());
@@ -249,6 +250,16 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHand
 builder.Services.AddScoped<InvestmentHub.API.Services.TokenService>();
 builder.Services.AddScoped<INotificationService, InvestmentHub.API.Services.SignalRNotificationService>();
 
+// Configure Forwarded Headers for Azure Container Apps (Reverse Proxy)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | 
+                               Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    // Trust all networks - Azure Load Balancer can come from any internal IP
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
 
 // Log Seq configuration status
@@ -279,33 +290,38 @@ else
 // Ensure database is created and seeded
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    // Use ServiceProvider to allow Seeder to create background scopes
     var yahooQuotes = scope.ServiceProvider.GetRequiredService<YahooQuotesApi.YahooQuotes>();
-    await DatabaseSeeder.SeedAsync(context, yahooQuotes);
+    await DatabaseSeeder.SeedAsync(scope.ServiceProvider, yahooQuotes);
 }
 
 // Configure the HTTP request pipeline.
+
+// Process Forwarded Headers FIRST so we know the real protocol (HTTPS) and IP
+app.UseForwardedHeaders();
+
+// Global exception handler
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI();
+    // Only use forced HTTPS redirection in Development
+    // In Production/Container Apps, TLS is terminated by Ingress, so we receive HTTP
+    app.UseHttpsRedirection();
 }
 
-app.UseHttpsRedirection();
+// Explicitly add UseRouting before CORS
+app.UseRouting();
 
-// Add Correlation ID middleware first (before other middleware)
-// This ensures Correlation ID is available in all subsequent logs
-// Add Correlation ID middleware first (before other middleware)
-// This ensures Correlation ID is available in all subsequent logs
-app.UseMiddleware<CorrelationIdMiddleware>();
-
-// Add other middleware
+// CORS MUST be used between UseRouting and UseEndpoints (MapControllers etc)
 app.UseCors("AllowAll");
 
-// Add global exception handler before mapping endpoints
-// This catches all exceptions from controllers and other middleware
-app.UseExceptionHandler();
+// Add Correlation ID middleware after CORS
+// This ensures Correlation ID is available in all subsequent logs
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 app.MapHealthChecksUI(options =>
 {

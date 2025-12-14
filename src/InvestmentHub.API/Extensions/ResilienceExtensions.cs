@@ -41,7 +41,8 @@ public static class ResilienceExtensions
     /// </summary>
     public static IServiceCollection AddInfrastructureHealthChecks(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         var healthChecksEnabled = configuration.GetValue<bool>("HealthChecks:Enabled", true);
         if (!healthChecksEnabled)
@@ -104,7 +105,19 @@ public static class ResilienceExtensions
             options.SetEvaluationTimeInSeconds(
                 configuration.GetValue<int>("HealthChecks:EvaluationIntervalSeconds", 30));
             options.MaximumHistoryEntriesPerEndpoint(50);
-            options.AddHealthCheckEndpoint("InvestmentHub API", "/health");
+            
+            // Determine the health check URL
+            // In development, use relative path to support random ports
+            // In production/container, use explicit localhost to avoid [::] address issues
+            var healthEndpointUrl = configuration["HealthChecks:Url"];
+            if (string.IsNullOrEmpty(healthEndpointUrl))
+            {
+                healthEndpointUrl = environment.IsDevelopment() 
+                    ? "/health" 
+                    : "http://localhost:8080/health";
+            }
+            
+            options.AddHealthCheckEndpoint("InvestmentHub API", healthEndpointUrl);
         })
         .AddInMemoryStorage();
 

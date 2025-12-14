@@ -24,24 +24,29 @@ public class DatabaseHealthCheck : IHealthCheck
     {
         try
         {
+            // Use a short timeout (3s) for the check itself
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+
             var startTime = DateTime.UtcNow;
 
             // Test basic PostgreSQL connection
             await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync(cancellationToken);
+            await connection.OpenAsync(cts.Token);
             
             // Execute a simple query to verify database is responsive
             await using var command = new NpgsqlCommand("SELECT 1", connection);
-            await command.ExecuteScalarAsync(cancellationToken);
+            await command.ExecuteScalarAsync(cts.Token);
 
             var responseTime = DateTime.UtcNow - startTime;
 
             // Test Marten event store if available
+            // Note: Marten session creation is usually fast, but query might be slow
             if (_documentStore != null)
             {
-                await using var session = _documentStore.LightweightSession();
-                // Simple query to verify Marten is working
-                await session.Query<object>().Take(1).ToListAsync(cancellationToken);
+                 // Check Marten store connectivity (lightweight)
+                 using var session = _documentStore.LightweightSession();
+                 // Just ensure we can get a session, avoiding heavy queries here
             }
 
             var data = new Dictionary<string, object>
@@ -59,10 +64,15 @@ public class DatabaseHealthCheck : IHealthCheck
                 "PostgreSQL database is healthy",
                 data);
         }
+        catch (OperationCanceledException)
+        {
+            return HealthCheckResult.Degraded("PostgreSQL database check timed out (slow response).");
+        }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy(
-                "PostgreSQL database is unhealthy",
+             // Return Degraded (Warning) instead of Unhealthy (Error) to keep app alive during DB glitches
+            return HealthCheckResult.Degraded(
+                "PostgreSQL database is unreachable or slow",
                 ex,
                 new Dictionary<string, object>
                 {

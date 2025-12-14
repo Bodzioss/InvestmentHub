@@ -110,13 +110,11 @@ public class CreatePortfolioCommandHandler : IRequestHandler<CreatePortfolioComm
 
             // 6. Start event stream for this portfolio and save events
             // Marten will automatically apply the projection to create PortfolioReadModel
-            // Extension method automatically adds OpenTelemetry tracing
             _session.Events.StartStreamWithTracing<PortfolioAggregate>(
                 request.PortfolioId.Value,
                 portfolioAggregate.GetUncommittedEvents().ToArray());
 
             // 7. Save changes to Marten (persist events + update projections)
-            // Extension method automatically adds OpenTelemetry tracing
             await _session.SaveChangesWithTracingAsync(cancellationToken);
 
             // 8. Record business metrics using extension method

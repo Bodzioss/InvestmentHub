@@ -55,6 +55,14 @@
       <Link>all_instruments_list.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\import_others.json" Condition="Exists('..\..\import_others.json')">
+      <Link>import_others.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\valid_global_instruments.json" Condition="Exists('..\..\valid_global_instruments.json')">
+      <Link>valid_global_instruments.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

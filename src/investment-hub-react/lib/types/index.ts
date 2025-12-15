@@ -1,0 +1,175 @@
+// ============================================
+// PORTFOLIO TYPES
+// ============================================
+
+export interface Portfolio {
+    id: string
+    ownerId: string
+    name: string
+    description?: string
+    currency: string
+    createdDate: string
+    activeInvestmentCount: number
+    totalValue?: Money
+    totalCost?: Money
+    unrealizedGainLoss?: Money
+}
+
+export interface CreatePortfolioRequest {
+    portfolioId: string
+    ownerId: string
+    name: string
+    description?: string
+    currency: string
+}
+
+export interface UpdatePortfolioRequest {
+    name: string
+    description?: string
+}
+
+// ============================================
+// INVESTMENT TYPES
+// ============================================
+
+export interface Investment {
+    id: string
+    portfolioId: string
+    symbol: Symbol
+    quantity: number
+    purchasePrice: Money
+    purchaseDate: string
+    salePrice?: Money
+    saleDate?: string
+    status: InvestmentStatus
+    currentPrice?: Money
+    unrealizedGainLoss?: Money
+    realizedGainLoss?: Money
+}
+
+export interface AddInvestmentRequest {
+    investmentId: string
+    portfolioId: string
+    symbol: Symbol
+    quantity: number
+    purchasePrice: Money
+    purchaseDate: string
+}
+
+export interface UpdateInvestmentRequest {
+    quantity: number
+    purchasePrice: Money
+    purchaseDate: string
+}
+
+export interface SellInvestmentRequest {
+    salePrice: Money
+    quantity?: number
+    saleDate: string
+}
+
+export enum InvestmentStatus {
+    Active = 'Active',
+    Sold = 'Sold',
+    Deleted = 'Deleted'
+}
+
+// ============================================
+// USER TYPES
+// ============================================
+
+export interface User {
+    id: string
+    email: string
+    name: string
+    role: string
+}
+
+export interface LoginRequest {
+    email: string
+    password: string
+}
+
+export interface LoginResponse {
+    token: string
+    user: User
+}
+
+export interface RegisterRequest {
+    email: string
+    name: string
+    password: string
+}
+
+export interface ChangePasswordRequest {
+    currentPassword: string
+    newPassword: string
+}
+
+// ============================================
+// COMMON VALUE OBJECTS
+// ============================================
+
+export interface Money {
+    amount: number
+    currency: string
+}
+
+export interface Symbol {
+    ticker: string
+    name: string
+    assetType: AssetType
+}
+
+export enum AssetType {
+    Stock = 'Stock',
+    Bond = 'Bond',
+    ETF = 'ETF',
+    Commodity = 'Commodity',
+    Cryptocurrency = 'Cryptocurrency',
+    Other = 'Other'
+}
+
+// ============================================
+// MARKET DATA TYPES
+// ============================================
+
+export interface MarketPrice {
+    symbol: string
+    price: number
+    currency: string
+    timestamp: string
+}
+
+export interface PriceHistory {
+    symbol: string
+    prices: PricePoint[]
+}
+
+export interface PricePoint {
+    date: string
+    price: number
+}
+
+export interface Instrument {
+    ticker: string
+    name: string
+    assetType: AssetType
+    currency: string
+}
+
+// ============================================
+// API RESPONSE TYPES
+// ============================================
+
+export interface ApiError {
+    error: string
+    details?: Record<string, string[]>
+}
+
+export interface PaginatedResponse<T> {
+    items: T[]
+    totalCount: number
+    page: number
+    pageSize: number
+}

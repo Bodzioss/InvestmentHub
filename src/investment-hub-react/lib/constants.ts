@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
 export const QUERY_KEYS = {
     PORTFOLIOS: 'portfolios',
     PORTFOLIO: 'portfolio',
+    PORTFOLIO_PERFORMANCE: 'portfolio_performance',
     INVESTMENTS: 'investments',
     INVESTMENT: 'investment',
     USERS: 'users',

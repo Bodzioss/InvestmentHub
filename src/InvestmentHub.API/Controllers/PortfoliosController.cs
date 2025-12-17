@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using InvestmentHub.Domain.Commands;
 using InvestmentHub.Domain.Queries;
 using InvestmentHub.Domain.ValueObjects;
+using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Domain.Entities;
 using AutoMapper;
 using InvestmentHub.Contracts;
 
@@ -18,6 +20,7 @@ public class PortfoliosController : ControllerBase
     private readonly IMediator _mediator;
     private readonly ILogger<PortfoliosController> _logger;
     private readonly IMapper _mapper;
+    private readonly IMarketPriceRepository _marketPriceRepository;
 
     /// <summary>
     /// Initializes a new instance of the PortfoliosController class.
@@ -25,11 +28,17 @@ public class PortfoliosController : ControllerBase
     /// <param name="mediator">The MediatR mediator</param>
     /// <param name="logger">The logger</param>
     /// <param name="mapper">The AutoMapper instance</param>
-    public PortfoliosController(IMediator mediator, ILogger<PortfoliosController> logger, IMapper mapper)
+    /// <param name="marketPriceRepository">The market price repository</param>
+    public PortfoliosController(
+        IMediator mediator,
+        ILogger<PortfoliosController> logger,
+        IMapper mapper,
+        IMarketPriceRepository marketPriceRepository)
     {
         _mediator = mediator;
         _logger = logger;
         _mapper = mapper;
+        _marketPriceRepository = marketPriceRepository;
     }
 
     /// <summary>
@@ -157,6 +166,30 @@ public class PortfoliosController : ControllerBase
             if (result.IsSuccess && result.Portfolio != null)
             {
                 var p = result.Portfolio;
+
+                // Get investments to calculate TotalCost and UnrealizedGainLoss
+                var investmentsQuery = new GetInvestmentsQuery(PortfolioId.FromString(portfolioId));
+                var investmentsResult = await _mediator.Send(investmentsQuery);
+
+                decimal totalValue = 0;
+                decimal totalCost = 0;
+                decimal unrealizedGainLoss = 0;
+
+                if (investmentsResult.IsSuccess && investmentsResult.Investments != null)
+                {
+                    foreach (var inv in investmentsResult.Investments)
+                    {
+                        // TotalValue = sum of current values
+                        totalValue += inv.CurrentValue.Amount;
+
+                        // InvestmentSummary already has TotalCost calculated
+                        totalCost += inv.TotalCost.Amount;
+
+                        // InvestmentSummary already has UnrealizedGainLoss calculated
+                        unrealizedGainLoss += inv.UnrealizedGainLoss.Amount;
+                    }
+                }
+
                 var response = new PortfolioResponseDto
                 {
                     Id = p.Id.ToString(),
@@ -167,18 +200,18 @@ public class PortfoliosController : ControllerBase
                     LastUpdated = p.LastUpdated,
                     TotalValue = new MoneyResponseDto
                     {
-                        Amount = p.TotalValue,
+                        Amount = totalValue,
                         Currency = p.Currency
                     },
                     TotalCost = new MoneyResponseDto
                     {
-                         Amount = 0, // TODO
-                         Currency = p.Currency
+                        Amount = totalCost,
+                        Currency = p.Currency
                     },
                     UnrealizedGainLoss = new MoneyResponseDto
                     {
-                         Amount = 0, // TODO
-                         Currency = p.Currency
+                        Amount = unrealizedGainLoss,
+                        Currency = p.Currency
                     },
                     ActiveInvestmentCount = p.InvestmentCount,
                     Currency = p.Currency
@@ -274,6 +307,226 @@ public class PortfoliosController : ControllerBase
         {
             _logger.LogError(ex, "Error deleting portfolio {PortfolioId}", id);
             return StatusCode(500, new { Error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Gets portfolio performance history.
+    /// </summary>
+    /// <param name="portfolioId">The portfolio ID</param>
+    /// <returns>Historical performance data</returns>
+    [HttpGet("{portfolioId}/performance")]
+    public async Task<IActionResult> GetPerformanceHistory([FromRoute] string portfolioId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting performance history for portfolio {PortfolioId}", portfolioId);
+
+            // Get all investments for this portfolio
+            var investmentsQuery = new GetInvestmentsQuery(PortfolioId.FromString(portfolioId));
+            var investmentsResult = await _mediator.Send(investmentsQuery);
+
+            if (!investmentsResult.IsSuccess || investmentsResult.Investments == null || !investmentsResult.Investments.Any())
+            {
+                _logger.LogWarning("No investments found for portfolio {PortfolioId}", portfolioId);
+
+                // Even without investments, return structure starting from portfolio creation
+                var portfolioQuery = new GetPortfolioQuery(PortfolioId.FromString(portfolioId));
+                var portfolioResult = await _mediator.Send(portfolioQuery);
+
+                if (portfolioResult.IsSuccess && portfolioResult.Portfolio != null)
+                {
+                    var startFromCreation = portfolioResult.Portfolio.CreatedAt.Date;
+                    return Ok(new PortfolioPerformanceResponse
+                    {
+                        DataPoints = new List<PerformanceDataPoint>
+                        {
+                            new PerformanceDataPoint { Date = startFromCreation, Value = 0 }
+                        },
+                        InvestmentValues = new Dictionary<string, List<PerformanceDataPoint>>(),
+                        StartDate = startFromCreation,
+                        EndDate = DateTime.UtcNow.Date,
+                        Currency = portfolioResult.Portfolio.Currency
+                    });
+                }
+
+                return Ok(new PortfolioPerformanceResponse
+                {
+                    DataPoints = new List<PerformanceDataPoint>(),
+                    InvestmentValues = new Dictionary<string, List<PerformanceDataPoint>>(),
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow,
+                    Currency = "USD"
+                });
+            }
+
+            var investments = investmentsResult.Investments.ToList();
+
+            // Use portfolio creation date, not earliest investment purchase date
+            var portfolioQueryForDate = new GetPortfolioQuery(PortfolioId.FromString(portfolioId));
+            var portfolioResultForDate = await _mediator.Send(portfolioQueryForDate);
+
+            DateTime startDate;
+            if (portfolioResultForDate.IsSuccess && portfolioResultForDate.Portfolio != null)
+            {
+                startDate = portfolioResultForDate.Portfolio.CreatedAt.Date;
+            }
+            else
+            {
+                // Fallback to earliest investment if portfolio query fails
+                startDate = investments.Min(i => i.PurchaseDate).Date;
+            }
+
+            var endDate = DateTime.UtcNow.Date;
+
+            // Get unique symbols
+            var symbols = investments.Select(i => i.Symbol.Ticker).Distinct().ToList();
+
+            // Fetch price history for all symbols
+            var priceHistories = new Dictionary<string, List<CachedMarketPrice>>();
+            foreach (var symbol in symbols)
+            {
+                var prices = await _marketPriceRepository.GetPriceHistoryAsync(
+                    symbol,
+                    startDate,
+                    endDate,
+                    CancellationToken.None);
+                priceHistories[symbol] = prices;
+            }
+
+            // Calculate value for each investment on each date
+            var investmentValues = new Dictionary<string, List<PerformanceDataPoint>>();
+            var allDates = new SortedSet<DateTime>();
+
+            foreach (var investment in investments)
+            {
+                var symbol = investment.Symbol.Ticker;
+                var investmentId = investment.Id.Value.ToString();
+                var quantity = investment.Quantity;
+                var purchaseDate = investment.PurchaseDate.Date;
+
+                var dataPoints = new List<PerformanceDataPoint>();
+
+                if (!priceHistories.TryGetValue(symbol, out var prices) || !prices.Any())
+                {
+                    continue; // Skip if no price history
+                }
+
+                // Add day before purchase with value 0
+                dataPoints.Add(new PerformanceDataPoint
+                {
+                    Date = purchaseDate.AddDays(-1),
+                    Value = 0
+                });
+                allDates.Add(purchaseDate.AddDays(-1));
+
+                // Calculate value for each date from purchase onwards
+                decimal? lastKnownPrice = null;
+                for (var date = purchaseDate; date <= endDate; date = date.AddDays(1))
+                {
+                    // Find price for this date (or use last known)
+                    var priceForDate = prices.FirstOrDefault(p => p.FetchedAt.Date == date);
+                    if (priceForDate != null)
+                    {
+                        lastKnownPrice = priceForDate.Price;
+                    }
+
+                    if (lastKnownPrice.HasValue)
+                    {
+                        var value = quantity * lastKnownPrice.Value;
+                        dataPoints.Add(new PerformanceDataPoint
+                        {
+                            Date = date,
+                            Value = value
+                        });
+                        allDates.Add(date);
+                    }
+                }
+
+                investmentValues[investmentId] = dataPoints;
+            }
+
+            // Aggregate to get total portfolio value for each date
+            var aggregatedDataPoints = new List<PerformanceDataPoint>();
+            foreach (var date in allDates)
+            {
+                decimal totalValue = 0;
+                foreach (var invValues in investmentValues.Values)
+                {
+                    // Find the value for this investment on this date (or closest earlier)
+                    var dataPoint = invValues
+                        .Where(dp => dp.Date <= date)
+                        .OrderByDescending(dp => dp.Date)
+                        .FirstOrDefault();
+
+                    if (dataPoint != null)
+                    {
+                        totalValue += dataPoint.Value;
+                    }
+                }
+
+                aggregatedDataPoints.Add(new PerformanceDataPoint
+                {
+                    Date = date,
+                    Value = totalValue
+                });
+            }
+
+            var response = new PortfolioPerformanceResponse
+            {
+                DataPoints = aggregatedDataPoints.OrderBy(d => d.Date).ToList(),
+                InvestmentValues = investmentValues,
+                StartDate = startDate,
+                EndDate = endDate,
+                Currency = investments.FirstOrDefault()?.CurrentValue.Currency.ToString() ?? "USD"
+            };
+
+            _logger.LogInformation("Returning {Count} data points for portfolio {PortfolioId}",
+                aggregatedDataPoints.Count, portfolioId);
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting performance history for portfolio {PortfolioId}", portfolioId);
+            return StatusCode(500, new { Error = "Failed to get performance history" });
+        }
+    }
+
+    /// <summary>
+    /// Gets cached prices for a symbol (for debugging).
+    /// </summary>
+    /// <param name="symbol">The symbol ticker</param>
+    /// <returns>List of cached prices</returns>
+    [HttpGet("cached-prices/{symbol}")]
+    public async Task<IActionResult> GetCachedPrices([FromRoute] string symbol)
+    {
+        try
+        {
+            var startDate = DateTime.UtcNow.AddDays(-30); // Last 30 days
+            var endDate = DateTime.UtcNow;
+
+            var prices = await _marketPriceRepository.GetPriceHistoryAsync(
+                symbol,
+                startDate,
+                endDate,
+                CancellationToken.None);
+
+            var response = prices.Select(p => new
+            {
+                symbol = p.Symbol,
+                price = p.Price,
+                currency = p.Currency,
+                fetchedAt = p.FetchedAt,
+                source = p.Source
+            }).ToList();
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting cached prices for symbol {Symbol}", symbol);
+            return StatusCode(500, new { Error = "Failed to get cached prices" });
         }
     }
 }

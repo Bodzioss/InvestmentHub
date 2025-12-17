@@ -42,18 +42,25 @@ export interface Investment {
     salePrice?: Money
     saleDate?: string
     status: InvestmentStatus
+    currentValue?: Money
     currentPrice?: Money
     unrealizedGainLoss?: Money
     realizedGainLoss?: Money
 }
 
 export interface AddInvestmentRequest {
-    investmentId: string
-    portfolioId: string
-    symbol: Symbol
+    portfolioId: string  // Backend expects PascalCase but axios transforms
+    symbol: {
+        ticker: string
+        exchange: string  // REQUIRED by backend
+        assetType: string
+    }
     quantity: number
-    purchasePrice: Money
-    purchaseDate: string
+    purchasePrice: {
+        amount: number
+        currency: string
+    }
+    purchaseDate: string  // ISO date string
 }
 
 export interface UpdateInvestmentRequest {
@@ -72,6 +79,36 @@ export enum InvestmentStatus {
     Active = 'Active',
     Sold = 'Sold',
     Deleted = 'Deleted'
+}
+
+// ============================================
+// INSTRUMENT TYPES
+// ============================================
+
+export interface Instrument {
+    id: string
+    name: string
+    ticker: string
+    exchange: string
+    assetType: string
+    isin: string
+}
+
+// ============================================
+// MARKET DATA TYPES
+// ============================================
+
+export interface MarketPrice {
+    symbol: string
+    price: number
+    currency: string
+    timestamp: string
+    source?: string
+    open?: number
+    high?: number
+    low?: number
+    close?: number
+    volume?: number
 }
 
 // ============================================
@@ -149,13 +186,6 @@ export interface PriceHistory {
 export interface PricePoint {
     date: string
     price: number
-}
-
-export interface Instrument {
-    ticker: string
-    name: string
-    assetType: AssetType
-    currency: string
 }
 
 // ============================================

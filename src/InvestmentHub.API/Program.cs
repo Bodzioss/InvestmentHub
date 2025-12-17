@@ -165,7 +165,7 @@ builder.Services.AddMediatR(cfg =>
 {
     // Register all handlers from the Domain assembly
     cfg.RegisterServicesFromAssembly(typeof(AddInvestmentCommandHandler).Assembly);
-    
+
     // Register pipeline behaviors
     cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
     cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
@@ -173,7 +173,7 @@ builder.Services.AddMediatR(cfg =>
 });
 
 // Add MassTransit for messaging
-var rabbitMqConnectionString = builder.Configuration["RabbitMQ:ConnectionString"] 
+var rabbitMqConnectionString = builder.Configuration["RabbitMQ:ConnectionString"]
     ?? "amqp://guest:guest@localhost:5672/";
 
 // If Aspire endpoint doesn't include credentials, add them
@@ -190,7 +190,7 @@ builder.Services.AddMassTransit(x =>
     {
         // Simple configuration - MassTransit will parse the connection string
         cfg.Host(rabbitMqConnectionString);
-        
+
         // Configure global retry policy with Exponential Backoff
         cfg.UseMessageRetry(r => r.Exponential(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(2)));
 
@@ -207,6 +207,8 @@ builder.Services.AddSingleton(new YahooQuotesBuilder().Build());
 
 // Add Market Data Provider
 builder.Services.AddScoped<IMarketDataProvider, YahooMarketDataProvider>();
+builder.Services.AddScoped<IMarketPriceRepository, InvestmentHub.Infrastructure.Repositories.MarketPriceRepository>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.Services.MarketPriceService>();
 
 // Add Background Jobs
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.PriceUpdateJob>();
@@ -253,7 +255,7 @@ builder.Services.AddScoped<INotificationService, InvestmentHub.API.Services.Sign
 // Configure Forwarded Headers for Azure Container Apps (Reverse Proxy)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | 
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
                                Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
     // Trust all networks - Azure Load Balancer can come from any internal IP
     options.KnownNetworks.Clear();

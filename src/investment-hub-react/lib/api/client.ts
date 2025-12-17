@@ -21,11 +21,21 @@ const apiClient: AxiosInstance = axios.create({
 
 apiClient.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-        // Pobierz token z localStorage
-        const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
+        // Pobierz token z zustand persisted state
+        const authState = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
 
-        if (token && config.headers) {
-            config.headers.Authorization = `Bearer ${token}`
+        if (authState && config.headers) {
+            try {
+                // Zustand persist zapisuje cały obiekt state jako JSON
+                const parsed = JSON.parse(authState)
+                const token = parsed.state?.token
+
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`
+                }
+            } catch (error) {
+                console.error('Failed to parse auth token:', error)
+            }
         }
 
         return config

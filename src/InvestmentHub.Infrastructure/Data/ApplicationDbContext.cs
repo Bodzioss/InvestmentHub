@@ -41,9 +41,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
         builder.Entity<User>(entity =>
         {
             entity.ToTable("Users");
-            
+
             entity.HasKey(u => u.Id);
-            
+
             // Configure UserId as value object
             entity.Property(u => u.Id)
                 .HasConversion(
@@ -70,9 +70,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
         builder.Entity<Portfolio>(entity =>
         {
             entity.ToTable("Portfolios");
-            
+
             entity.HasKey(p => p.Id);
-            
+
             // Configure PortfolioId as value object
             entity.Property(p => p.Id)
                 .HasConversion(
@@ -114,7 +114,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
 
             // Ignore the domain events collection
             entity.Ignore(p => p.DomainEvents);
-            
+
             // Ignore the Investments collection as it's managed by EF Core navigation
             entity.Ignore(p => p.Investments);
 
@@ -127,7 +127,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
         builder.Entity<Investment>(entity =>
         {
             entity.ToTable("Investments");
-            
+
             entity.HasKey(i => i.Id);
 
             // Configure InvestmentId as value object
@@ -217,11 +217,51 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
 
         // Apply all configurations from assembly
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        // Configure CachedMarketPrice entity
+        builder.Entity<CachedMarketPrice>(entity =>
+        {
+            entity.ToTable("CachedMarketPrices");
+
+            entity.HasKey(c => c.Id);
+
+            entity.Property(c => c.Symbol)
+                .HasMaxLength(10)
+                .IsRequired();
+
+            entity.Property(c => c.Price)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired();
+
+            entity.Property(c => c.Currency)
+                .HasMaxLength(3)
+                .IsRequired();
+
+            entity.Property(c => c.FetchedAt)
+                .IsRequired();
+
+            entity.Property(c => c.Source)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            // Create composite index for efficient lookups by symbol and date
+            entity.HasIndex(c => new { c.Symbol, c.FetchedAt })
+                .HasDatabaseName("IX_CachedMarketPrices_Symbol_FetchedAt");
+
+            // Index on FetchedAt for cleanup queries
+            entity.HasIndex(c => c.FetchedAt)
+                .HasDatabaseName("IX_CachedMarketPrices_FetchedAt");
+        });
     }
 
     /// <summary>
     /// Gets or sets the Instruments DbSet.
     /// </summary>
     public DbSet<Instrument> Instruments => Set<Instrument>();
+
+    /// <summary>
+    /// Gets or sets the CachedMarketPrices DbSet.
+    /// </summary>
+    public DbSet<CachedMarketPrice> CachedMarketPrices => Set<CachedMarketPrice>();
 }
 

@@ -17,7 +17,7 @@ export function PerformanceChart({ portfolio }: PerformanceChartProps) {
     const chartData = performanceData?.dataPoints.map(point => ({
         date: new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         value: point.value,
-        cost: portfolio.totalCost?.amount || 0
+        cost: point.totalCost // Use totalCost from API (grows over time as investments are purchased)
     })) || []
 
     return (
@@ -52,7 +52,7 @@ export function PerformanceChart({ portfolio }: PerformanceChartProps) {
                                 tickFormatter={(value) => `${value.toFixed(0)}`}
                             />
                             <Tooltip
-                                formatter={(value: number) => [`${value.toFixed(2)} ${portfolio.currency}`, '']}
+                                formatter={(value: number | undefined) => [`${(value ?? 0).toFixed(2)} ${portfolio.currency}`, '']}
                             />
                             <Legend />
                             <Line

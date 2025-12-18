@@ -341,7 +341,7 @@ public class PortfoliosController : ControllerBase
                     {
                         DataPoints = new List<PerformanceDataPoint>
                         {
-                            new PerformanceDataPoint { Date = startFromCreation, Value = 0 }
+                            new PerformanceDataPoint { Date = startFromCreation, Value = 0, TotalCost = 0 }
                         },
                         InvestmentValues = new Dictionary<string, List<PerformanceDataPoint>>(),
                         StartDate = startFromCreation,
@@ -366,16 +366,25 @@ public class PortfoliosController : ControllerBase
             var portfolioQueryForDate = new GetPortfolioQuery(PortfolioId.FromString(portfolioId));
             var portfolioResultForDate = await _mediator.Send(portfolioQueryForDate);
 
-            DateTime startDate;
+            DateTime portfolioCreationDate;
             if (portfolioResultForDate.IsSuccess && portfolioResultForDate.Portfolio != null)
             {
-                startDate = portfolioResultForDate.Portfolio.CreatedAt.Date;
+                portfolioCreationDate = portfolioResultForDate.Portfolio.CreatedAt.Date;
             }
             else
             {
                 // Fallback to earliest investment if portfolio query fails
-                startDate = investments.Min(i => i.PurchaseDate).Date;
+                portfolioCreationDate = investments.Min(i => i.PurchaseDate).Date;
             }
+
+            // Chart should start from ZERO on the day BEFORE portfolio creation or first investment
+            var earliestInvestmentDate = investments.Min(i => i.PurchaseDate).Date;
+            var chartStartDate = portfolioCreationDate < earliestInvestmentDate
+                ? portfolioCreationDate
+                : earliestInvestmentDate;
+
+            // Start from the day BEFORE
+            var startDate = chartStartDate.AddDays(-1);
 
             var endDate = DateTime.UtcNow.Date;
 
@@ -383,7 +392,8 @@ public class PortfoliosController : ControllerBase
             var symbols = investments.Select(i => i.Symbol.Ticker).Distinct().ToList();
 
             // Fetch price history for all symbols
-            var priceHistories = new Dictionary<string, List<CachedMarketPrice>>();
+            // GetPriceHistoryAsync now returns one price per day (the latest for each day)
+            var priceHistories = new Dictionary<string, Dictionary<DateTime, decimal>>();
             foreach (var symbol in symbols)
             {
                 var prices = await _marketPriceRepository.GetPriceHistoryAsync(
@@ -391,12 +401,31 @@ public class PortfoliosController : ControllerBase
                     startDate,
                     endDate,
                     CancellationToken.None);
-                priceHistories[symbol] = prices;
+
+                // Convert to dictionary keyed by date (not datetime) for faster lookups
+                priceHistories[symbol] = prices.ToDictionary(
+                    p => p.FetchedAt.Date,
+                    p => p.Price
+                );
             }
 
             // Calculate value for each investment on each date
             var investmentValues = new Dictionary<string, List<PerformanceDataPoint>>();
             var allDates = new SortedSet<DateTime>();
+
+            // Track investment costs by purchase date for TotalCost calculation
+            var investmentCostByDate = new Dictionary<DateTime, decimal>();
+            foreach (var investment in investments)
+            {
+                var purchaseDate = investment.PurchaseDate.Date;
+                var cost = investment.TotalCost.Amount; // Cost = quantity * purchase price
+
+                if (!investmentCostByDate.ContainsKey(purchaseDate))
+                {
+                    investmentCostByDate[purchaseDate] = 0;
+                }
+                investmentCostByDate[purchaseDate] += cost;
+            }
 
             foreach (var investment in investments)
             {
@@ -407,46 +436,53 @@ public class PortfoliosController : ControllerBase
 
                 var dataPoints = new List<PerformanceDataPoint>();
 
-                if (!priceHistories.TryGetValue(symbol, out var prices) || !prices.Any())
+                if (!priceHistories.TryGetValue(symbol, out var pricesByDate) || !pricesByDate.Any())
                 {
                     continue; // Skip if no price history
                 }
 
-                // Add day before purchase with value 0
-                dataPoints.Add(new PerformanceDataPoint
-                {
-                    Date = purchaseDate.AddDays(-1),
-                    Value = 0
-                });
-                allDates.Add(purchaseDate.AddDays(-1));
+                // Add data points from chart start (day before portfolio/investment) to now
+                // Before purchase date: value = 0
+                // After purchase date: value = quantity * price
 
-                // Calculate value for each date from purchase onwards
                 decimal? lastKnownPrice = null;
-                for (var date = purchaseDate; date <= endDate; date = date.AddDays(1))
+                for (var date = startDate; date <= endDate; date = date.AddDays(1))
                 {
-                    // Find price for this date (or use last known)
-                    var priceForDate = prices.FirstOrDefault(p => p.FetchedAt.Date == date);
-                    if (priceForDate != null)
+                    if (date < purchaseDate)
                     {
-                        lastKnownPrice = priceForDate.Price;
-                    }
-
-                    if (lastKnownPrice.HasValue)
-                    {
-                        var value = quantity * lastKnownPrice.Value;
+                        // Before purchase: contribute 0
                         dataPoints.Add(new PerformanceDataPoint
                         {
                             Date = date,
-                            Value = value
+                            Value = 0
                         });
                         allDates.Add(date);
+                    }
+                    else
+                    {
+                        // After purchase: find price for this date (or use last known)
+                        if (pricesByDate.TryGetValue(date, out var price))
+                        {
+                            lastKnownPrice = price;
+                        }
+
+                        if (lastKnownPrice.HasValue)
+                        {
+                            var value = quantity * lastKnownPrice.Value;
+                            dataPoints.Add(new PerformanceDataPoint
+                            {
+                                Date = date,
+                                Value = value
+                            });
+                            allDates.Add(date);
+                        }
                     }
                 }
 
                 investmentValues[investmentId] = dataPoints;
             }
 
-            // Aggregate to get total portfolio value for each date
+            // Aggregate to get total portfolio value and total cost for each date
             var aggregatedDataPoints = new List<PerformanceDataPoint>();
             foreach (var date in allDates)
             {
@@ -465,10 +501,16 @@ public class PortfoliosController : ControllerBase
                     }
                 }
 
+                // Calculate cumulative total cost up to this date
+                decimal totalCost = investmentCostByDate
+                    .Where(kvp => kvp.Key <= date)
+                    .Sum(kvp => kvp.Value);
+
                 aggregatedDataPoints.Add(new PerformanceDataPoint
                 {
                     Date = date,
-                    Value = totalValue
+                    Value = totalValue,
+                    TotalCost = totalCost
                 });
             }
 

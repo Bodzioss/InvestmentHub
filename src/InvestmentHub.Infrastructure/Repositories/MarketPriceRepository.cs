@@ -53,10 +53,23 @@ public class MarketPriceRepository : IMarketPriceRepository
         DateTime endDate,
         CancellationToken cancellationToken)
     {
-        return await _context.CachedMarketPrices
-            .Where(p => p.Symbol == symbol && p.FetchedAt >= startDate && p.FetchedAt <= endDate)
-            .OrderBy(p => p.FetchedAt)
+        // Normalize dates to start of day for proper comparison
+        // Important: PostgreSQL requires DateTimes with Kind=UTC, so we use SpecifyKind
+        var normalizedStart = DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc);
+        var normalizedEnd = DateTime.SpecifyKind(endDate.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+
+        // Group by date and take the most recent price for each day
+        // This ensures we get only one price per day, avoiding duplicate values for today/yesterday
+        var prices = await _context.CachedMarketPrices
+            .Where(p => p.Symbol == symbol && p.FetchedAt >= normalizedStart && p.FetchedAt <= normalizedEnd)
             .ToListAsync(cancellationToken);
+
+        // Group by date (not datetime) and select the latest price for each day
+        return prices
+            .GroupBy(p => p.FetchedAt.Date)
+            .Select(g => g.OrderByDescending(p => p.FetchedAt).First())
+            .OrderBy(p => p.FetchedAt)
+            .ToList();
     }
 
     public async Task SavePriceAsync(CachedMarketPrice price, CancellationToken cancellationToken = default)

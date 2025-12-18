@@ -160,16 +160,16 @@ public class PortfolioPerformanceResponse
 {
     /// <summary>Gets or sets the list of aggregated data points</summary>
     public List<PerformanceDataPoint> DataPoints { get; set; } = new();
-    
+
     /// <summary>Gets or sets per-investment value history for detailed analysis</summary>
     public Dictionary<string, List<PerformanceDataPoint>> InvestmentValues { get; set; } = new();
-    
+
     /// <summary>Gets or sets the start date of the performance history</summary>
     public DateTime StartDate { get; set; }
-    
+
     /// <summary>Gets or sets the end date of the performance history</summary>
     public DateTime EndDate { get; set; }
-    
+
     /// <summary>Gets or sets the currency</summary>
     public string Currency { get; set; } = string.Empty;
 }
@@ -181,7 +181,10 @@ public class PerformanceDataPoint
 {
     /// <summary>Gets or sets the date for this data point</summary>
     public DateTime Date { get; set; }
-    
+
     /// <summary>Gets or sets the portfolio value on this date</summary>
     public decimal Value { get; set; }
+
+    /// <summary>Gets or sets the total cost (cumulative) up to this date</summary>
+    public decimal TotalCost { get; set; }
 }

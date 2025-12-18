@@ -36,6 +36,7 @@ export async function deletePortfolio(portfolioId: string): Promise<void> {
 export interface PerformanceDataPoint {
     date: string
     value: number
+    totalCost: number
 }
 
 export interface PortfolioPerformanceResponse {

@@ -33,6 +33,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     /// </summary>
     public DbSet<Investment> Investments => Set<Investment>();
 
+    /// <summary>
+    /// Gets or sets the Transactions DbSet.
+    /// </summary>
+    public DbSet<InvestmentHub.Domain.Aggregates.Transaction> Transactions => Set<InvestmentHub.Domain.Aggregates.Transaction>();
+
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

@@ -69,9 +69,15 @@ export interface UpdateInvestmentRequest {
     purchaseDate: string
 }
 
+export interface UpdateInvestmentValueRequest {
+    investmentId: string
+    currentPrice: Money
+}
+
 export interface SellInvestmentRequest {
+    investmentId: string
     salePrice: Money
-    quantity?: number
+    quantityToSell?: number
     saleDate: string
 }
 

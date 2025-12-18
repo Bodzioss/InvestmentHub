@@ -1,25 +1,49 @@
 'use client'
 
+import { useState } from 'react'
 import { useCurrentUser, useLogout, usePortfolios } from '@/lib/hooks'
 import { useAuthStore } from '@/lib/stores'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { CreatePortfolioDialog } from '@/components/portfolio/create-portfolio-dialog'
+import { EditPortfolioDialog } from '@/components/portfolio/edit-portfolio-dialog'
+import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { toast } from 'sonner'
+import { deletePortfolio } from '@/lib/api/portfolios'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import type { Portfolio } from '@/lib/types'
 
 export default function HomePage() {
   const user = useCurrentUser()
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const logout = useLogout()
   const router = useRouter()
+  const queryClient = useQueryClient()
 
-  // Debug logging
-  console.log('Dashboard render:', { user, isAuthenticated })
+  // State for edit/delete dialogs
+  const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null)
+  const [deletingPortfolio, setDeletingPortfolio] = useState<Portfolio | null>(null)
 
-  // Get portfolios for current user (only if user.id exists)
+  // Get portfolios for current user
   const { data: portfolios, isLoading, error } = usePortfolios(user?.id || '')
+
+  // Delete portfolio mutation
+  const deletePortfolioMutation = useMutation({
+    mutationFn: async (portfolioId: string) => {
+      await deletePortfolio(portfolioId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['portfolios'] })
+      toast.success('Portfolio deleted successfully')
+      setDeletingPortfolio(null)
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete portfolio: ${error.message}`)
+    },
+  })
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -29,8 +53,23 @@ export default function HomePage() {
   }, [isAuthenticated, router])
 
   if (!isAuthenticated || !user) {
-    console.log('Not authenticated, showing null')
     return null // Loading state while redirecting
+  }
+
+  const handleEdit = (e: React.MouseEvent, portfolio: Portfolio) => {
+    e.stopPropagation() // Prevent card click
+    setEditingPortfolio(portfolio)
+  }
+
+  const handleDelete = (e: React.MouseEvent, portfolio: Portfolio) => {
+    e.stopPropagation() // Prevent card click
+    setDeletingPortfolio(portfolio)
+  }
+
+  const handleConfirmDelete = () => {
+    if (deletingPortfolio) {
+      deletePortfolioMutation.mutate(deletingPortfolio.id)
+    }
   }
 
   return (
@@ -44,6 +83,9 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            <Button variant="outline" onClick={() => router.push('/profile')}>
+              Profile
+            </Button>
             <Button variant="outline" onClick={logout}>
               Logout
             </Button>
@@ -153,13 +195,28 @@ export default function HomePage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => router.push(`/portfolio/${portfolio.id}`)}
+                  >
                     View
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={(e) => handleEdit(e, portfolio)}
+                  >
                     Edit
                   </Button>
-                  <Button variant="outline" size="sm" className="text-destructive">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={(e) => handleDelete(e, portfolio)}
+                  >
                     Delete
                   </Button>
                 </CardFooter>
@@ -168,6 +225,27 @@ export default function HomePage() {
           </div>
         )}
       </main>
+
+      {/* Edit Portfolio Dialog */}
+      {editingPortfolio && (
+        <EditPortfolioDialog
+          portfolio={editingPortfolio}
+          open={!!editingPortfolio}
+          onOpenChange={(open) => !open && setEditingPortfolio(null)}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deletingPortfolio}
+        onOpenChange={(open) => !open && setDeletingPortfolio(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Portfolio"
+        description={`Are you sure you want to delete "${deletingPortfolio?.name}"? This action cannot be undone and will delete all associated investments.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import type {
     Investment,
     AddInvestmentRequest,
     UpdateInvestmentRequest,
+    UpdateInvestmentValueRequest,
     SellInvestmentRequest
 } from '../types'
 
@@ -55,15 +56,27 @@ export async function updateInvestment(
 }
 
 /**
+ * Update investment current price/value
+ */
+export async function updateInvestmentValue(
+    investmentId: string,
+    request: UpdateInvestmentValueRequest
+): Promise<void> {
+    await apiClient.put(
+        '/api/investments/value',
+        request
+    )
+}
+
+/**
  * Sell investment (partial or full)
  */
 export async function sellInvestment(
-    portfolioId: string,
     investmentId: string,
     request: SellInvestmentRequest
 ): Promise<void> {
     await apiClient.post(
-        `/api/portfolios/${portfolioId}/investments/${investmentId}/sell`,
+        '/api/investments/sell',
         request
     )
 }

@@ -113,6 +113,7 @@ builder.Services.AddScoped<InvestmentHub.Domain.Services.IMetricsRecorder, Inves
 builder.Services.AddScoped<IInvestmentRepository, InvestmentRepository>();
 builder.Services.AddScoped<IPortfolioRepository, PortfolioRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 
 // Register domain services
 builder.Services.AddScoped<IPortfolioValuationService, PortfolioValuationService>();

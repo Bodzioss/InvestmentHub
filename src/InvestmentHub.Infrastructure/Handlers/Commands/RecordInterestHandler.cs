@@ -1,8 +1,9 @@
 using InvestmentHub.Domain.Aggregates;
 using InvestmentHub.Domain.Commands;
+using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Infrastructure.Data;
+using Marten;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Infrastructure.Handlers.Commands;
@@ -10,11 +11,16 @@ namespace InvestmentHub.Infrastructure.Handlers.Commands;
 public class RecordInterestHandler : IRequestHandler<RecordInterestCommand, RecordInterestResult>
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentSession _session;
     private readonly ILogger<RecordInterestHandler> _logger;
 
-    public RecordInterestHandler(ApplicationDbContext dbContext, ILogger<RecordInterestHandler> logger)
+    public RecordInterestHandler(
+        ApplicationDbContext dbContext,
+        IDocumentSession session,
+        ILogger<RecordInterestHandler> logger)
     {
         _dbContext = dbContext;
+        _session = session;
         _logger = logger;
     }
 
@@ -22,8 +28,9 @@ public class RecordInterestHandler : IRequestHandler<RecordInterestCommand, Reco
     {
         try
         {
-            var portfolioExists = await _dbContext.Portfolios.AnyAsync(p => p.Id == request.PortfolioId, cancellationToken);
-            if (!portfolioExists) return RecordInterestResult.Failure("Portfolio not found");
+            // Validate portfolio exists using Marten read model
+            var portfolio = await _session.LoadAsync<PortfolioReadModel>(request.PortfolioId.Value, cancellationToken);
+            if (portfolio == null) return RecordInterestResult.Failure($"Portfolio {request.PortfolioId.Value} not found");
 
             var transaction = Transaction.RecordInterest(request.PortfolioId, request.Symbol, request.GrossAmount, request.PaymentDate, request.TaxRate, request.Notes);
             await _dbContext.Transactions.AddAsync(transaction, cancellationToken);

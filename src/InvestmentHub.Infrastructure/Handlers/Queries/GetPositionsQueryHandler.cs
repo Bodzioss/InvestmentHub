@@ -2,6 +2,7 @@ using InvestmentHub.Domain.Aggregates;
 using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.Models;
 using InvestmentHub.Domain.Queries;
+using InvestmentHub.Domain.Repositories;
 using InvestmentHub.Domain.ValueObjects;
 using InvestmentHub.Infrastructure.Data;
 using MediatR;
@@ -17,11 +18,16 @@ namespace InvestmentHub.Infrastructure.Handlers.Queries;
 public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPositionsResult>
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IMarketPriceRepository _marketPriceRepository;
     private readonly ILogger<GetPositionsQueryHandler> _logger;
 
-    public GetPositionsQueryHandler(ApplicationDbContext dbContext, ILogger<GetPositionsQueryHandler> logger)
+    public GetPositionsQueryHandler(
+        ApplicationDbContext dbContext,
+        IMarketPriceRepository marketPriceRepository,
+        ILogger<GetPositionsQueryHandler> logger)
     {
         _dbContext = dbContext;
+        _marketPriceRepository = marketPriceRepository;
         _logger = logger;
     }
 
@@ -51,7 +57,7 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
             {
                 // Get the Symbol from the first transaction in the group
                 var symbol = group.First().Symbol;
-                var position = CalculatePosition(symbol, group.ToList());
+                var position = await CalculatePositionAsync(symbol, group.ToList(), cancellationToken);
                 if (position.TotalQuantity > 0 || position.TotalIncome.Amount > 0)
                 {
                     positions.Add(position);
@@ -70,7 +76,7 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
     /// <summary>
     /// Calculate position for a symbol using FIFO cost basis.
     /// </summary>
-    private Position CalculatePosition(Symbol symbol, List<Transaction> transactions)
+    private async Task<Position> CalculatePositionAsync(Symbol symbol, List<Transaction> transactions, CancellationToken cancellationToken)
     {
         var currency = transactions.FirstOrDefault()?.PricePerUnit?.Currency
             ?? transactions.FirstOrDefault()?.GrossAmount?.Currency
@@ -98,12 +104,10 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
             totalDividends.Amount + totalInterest.Amount,
             currency);
 
-        // For current price, use latest transaction price or zero
-        var latestPrice = buys.LastOrDefault()?.PricePerUnit
-            ?? sells.LastOrDefault()?.PricePerUnit
-            ?? new Money(0, currency);
+        // Fetch current market price from cache
+        var currentPrice = await GetCurrentPriceAsync(symbol.Ticker, currency, buys, sells, cancellationToken);
 
-        var currentValue = new Money(latestPrice.Amount * remainingQuantity, currency);
+        var currentValue = new Money(currentPrice.Amount * remainingQuantity, currency);
         var unrealizedGainLoss = new Money(currentValue.Amount - totalCost.Amount, currency);
         var unrealizedPercent = totalCost.Amount > 0
             ? (unrealizedGainLoss.Amount / totalCost.Amount) * 100
@@ -119,7 +123,7 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
             TotalQuantity = remainingQuantity,
             AverageCost = averageCost,
             TotalCost = totalCost,
-            CurrentPrice = latestPrice,
+            CurrentPrice = currentPrice,
             CurrentValue = currentValue,
             UnrealizedGainLoss = unrealizedGainLoss,
             UnrealizedGainLossPercent = unrealizedPercent,
@@ -129,6 +133,39 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
             RealizedGainLoss = realizedGains,
             MaturityDate = maturityDate
         };
+    }
+
+    /// <summary>
+    /// Gets current market price from cache, falling back to buy price if not available.
+    /// </summary>
+    private async Task<Money> GetCurrentPriceAsync(
+        string ticker,
+        Currency currency,
+        List<Transaction> buys,
+        List<Transaction> sells,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var cachedPrice = await _marketPriceRepository.GetLatestPriceAsync(ticker, cancellationToken);
+            if (cachedPrice != null)
+            {
+                _logger.LogDebug("Using cached market price {Price} for {Symbol}", cachedPrice.Price, ticker);
+                return new Money(cachedPrice.Price, currency);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get cached price for {Symbol}, falling back to transaction price", ticker);
+        }
+
+        // Fallback: use latest transaction price
+        var fallbackPrice = buys.LastOrDefault()?.PricePerUnit
+            ?? sells.LastOrDefault()?.PricePerUnit
+            ?? new Money(0, currency);
+
+        _logger.LogDebug("No cached price for {Symbol}, using fallback price {Price}", ticker, fallbackPrice.Amount);
+        return fallbackPrice;
     }
 
     /// <summary>

@@ -167,6 +167,9 @@ builder.Services.AddMediatR(cfg =>
     // Register all handlers from the Domain assembly
     cfg.RegisterServicesFromAssembly(typeof(AddInvestmentCommandHandler).Assembly);
 
+    // Register all handlers from the Infrastructure assembly (transaction handlers)
+    cfg.RegisterServicesFromAssembly(typeof(InvestmentHub.Infrastructure.Handlers.Queries.GetTransactionsQueryHandler).Assembly);
+
     // Register pipeline behaviors
     cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
     cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));

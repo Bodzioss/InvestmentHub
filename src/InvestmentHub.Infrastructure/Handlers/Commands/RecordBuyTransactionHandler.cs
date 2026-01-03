@@ -1,8 +1,9 @@
 using InvestmentHub.Domain.Aggregates;
 using InvestmentHub.Domain.Commands;
+using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Infrastructure.Data;
+using Marten;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Infrastructure.Handlers.Commands;
@@ -14,13 +15,16 @@ namespace InvestmentHub.Infrastructure.Handlers.Commands;
 public class RecordBuyTransactionHandler : IRequestHandler<RecordBuyTransactionCommand, RecordBuyTransactionResult>
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentSession _session;
     private readonly ILogger<RecordBuyTransactionHandler> _logger;
 
     public RecordBuyTransactionHandler(
         ApplicationDbContext dbContext,
+        IDocumentSession session,
         ILogger<RecordBuyTransactionHandler> logger)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -33,14 +37,13 @@ public class RecordBuyTransactionHandler : IRequestHandler<RecordBuyTransactionC
             _logger.LogInformation("Recording BUY transaction for portfolio {PortfolioId}, symbol {Symbol}",
                 request.PortfolioId.Value, request.Symbol.Ticker);
 
-            // Validate portfolio exists
-            var portfolioExists = await _dbContext.Portfolios
-                .AnyAsync(p => p.Id == request.PortfolioId, cancellationToken);
+            // Validate portfolio exists using Marten read model
+            var portfolio = await _session.LoadAsync<PortfolioReadModel>(request.PortfolioId.Value, cancellationToken);
 
-            if (!portfolioExists)
+            if (portfolio == null)
             {
-                _logger.LogWarning("Portfolio {PortfolioId} not found", request.PortfolioId.Value);
-                return RecordBuyTransactionResult.Failure("Portfolio not found");
+                _logger.LogWarning("Portfolio {PortfolioId} not found in Marten", request.PortfolioId.Value);
+                return RecordBuyTransactionResult.Failure($"Portfolio {request.PortfolioId.Value} not found");
             }
 
             // Create Transaction aggregate (generates BuyTransactionRecorded event)

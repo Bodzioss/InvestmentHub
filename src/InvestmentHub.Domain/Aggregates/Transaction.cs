@@ -37,6 +37,14 @@ public class Transaction : AggregateRoot
     private Transaction() { }
 
     /// <summary>
+    /// Converts DateTime to UTC for PostgreSQL compatibility
+    /// </summary>
+    private static DateTime ToUtc(DateTime dateTime) =>
+        dateTime.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
+            : dateTime.ToUniversalTime();
+
+    /// <summary>
     /// Records a BUY transaction
     /// </summary>
     public static Transaction RecordBuy(
@@ -58,8 +66,8 @@ public class Transaction : AggregateRoot
             Quantity = quantity,
             PricePerUnit = pricePerUnit,
             Fee = fee,
-            MaturityDate = maturityDate,
-            TransactionDate = transactionDate,
+            MaturityDate = maturityDate.HasValue ? ToUtc(maturityDate.Value) : null,
+            TransactionDate = ToUtc(transactionDate),
             Status = TransactionStatus.Active,
             Notes = notes
         };
@@ -98,7 +106,7 @@ public class Transaction : AggregateRoot
             Quantity = quantity,
             PricePerUnit = salePrice,
             Fee = fee,
-            TransactionDate = transactionDate,
+            TransactionDate = ToUtc(transactionDate),
             Status = TransactionStatus.Active,
             Notes = notes
         };
@@ -145,7 +153,7 @@ public class Transaction : AggregateRoot
             TaxRate = taxRate,
             TaxWithheld = taxWithheld,
             NetAmount = netAmount,
-            TransactionDate = paymentDate,
+            TransactionDate = ToUtc(paymentDate),
             Status = TransactionStatus.Active,
             Notes = notes
         };
@@ -192,7 +200,7 @@ public class Transaction : AggregateRoot
             TaxRate = taxRate,
             TaxWithheld = taxWithheld,
             NetAmount = netAmount,
-            TransactionDate = paymentDate,
+            TransactionDate = ToUtc(paymentDate),
             Status = TransactionStatus.Active,
             Notes = notes
         };

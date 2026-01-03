@@ -1,16 +1,15 @@
 'use client'
 
-import { use } from 'react'
+import { use, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
-import { usePortfolio, useInvestments, useRefreshPortfolioPrices } from '@/lib/hooks'
+import { ArrowLeft, RefreshCw, Plus, Receipt, BarChart3, Wallet } from 'lucide-react'
+import { usePortfolio, useRefreshPortfolioPrices } from '@/lib/hooks'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PortfolioSummary } from '@/components/portfolio/portfolio-summary'
-import { AssetAllocationChart } from '@/components/portfolio/asset-allocation-chart'
 import { PerformanceChart } from '@/components/portfolio/performance-chart'
-import { AddInvestmentDialog } from '@/components/portfolio/add-investment-dialog'
-import { InvestmentsList } from '@/components/portfolio/investments-list'
+import { RecordTransactionDialog, TransactionsList, PositionsList, IncomeReport } from '@/components/transaction'
 
 interface PortfolioDetailsPageProps {
     params: Promise<{
@@ -19,10 +18,10 @@ interface PortfolioDetailsPageProps {
 }
 
 export default function PortfolioDetailsPage({ params }: PortfolioDetailsPageProps) {
-    const { id } = use(params) // Unwrap the promise
+    const { id } = use(params)
     const router = useRouter()
+    const [activeTab, setActiveTab] = useState('positions')
     const { data: portfolio, isLoading: portfolioLoading, error: portfolioError } = usePortfolio(id)
-    const { data: investments, isLoading: investmentsLoading } = useInvestments(id)
     const refreshPrices = useRefreshPortfolioPrices()
 
     if (portfolioLoading) {
@@ -78,10 +77,12 @@ export default function PortfolioDetailsPage({ params }: PortfolioDetailsPagePro
                             <RefreshCw className={`mr-2 h-4 w-4 ${refreshPrices.isPending ? 'animate-spin' : ''}`} />
                             {refreshPrices.isPending ? 'Refreshing...' : 'Refresh Prices'}
                         </Button>
-                        <AddInvestmentDialog portfolioId={id}>
-                            <Button variant="outline">Add Investment</Button>
-                        </AddInvestmentDialog>
-                        <Button variant="outline">Edit Portfolio</Button>
+                        <RecordTransactionDialog portfolioId={id}>
+                            <Button>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Record Transaction
+                            </Button>
+                        </RecordTransactionDialog>
                     </div>
                 </div>
             </header>
@@ -92,17 +93,39 @@ export default function PortfolioDetailsPage({ params }: PortfolioDetailsPagePro
                 <PortfolioSummary portfolio={portfolio} />
 
                 {/* Charts Section */}
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Asset Allocation Chart */}
-                    <AssetAllocationChart investments={investments || []} />
+                <PerformanceChart portfolio={portfolio} />
 
-                    {/* Performance Chart */}
-                    <PerformanceChart portfolio={portfolio} />
-                </div>
+                {/* Tabbed Content: Positions, Transactions, Income */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                    <TabsList className="grid w-full grid-cols-3 lg:w-[450px]">
+                        <TabsTrigger value="positions" className="flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4" />
+                            Positions
+                        </TabsTrigger>
+                        <TabsTrigger value="transactions" className="flex items-center gap-2">
+                            <Receipt className="h-4 w-4" />
+                            Transactions
+                        </TabsTrigger>
+                        <TabsTrigger value="income" className="flex items-center gap-2">
+                            <Wallet className="h-4 w-4" />
+                            Income
+                        </TabsTrigger>
+                    </TabsList>
 
-                {/* Investments List */}
-                <InvestmentsList investments={investments || []} isLoading={investmentsLoading} />
+                    <TabsContent value="positions">
+                        <PositionsList portfolioId={id} />
+                    </TabsContent>
+
+                    <TabsContent value="transactions">
+                        <TransactionsList portfolioId={id} />
+                    </TabsContent>
+
+                    <TabsContent value="income">
+                        <IncomeReport portfolioId={id} />
+                    </TabsContent>
+                </Tabs>
             </main>
         </div>
     )
 }
+

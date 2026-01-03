@@ -1,6 +1,8 @@
 using InvestmentHub.Domain.Aggregates;
 using InvestmentHub.Domain.Commands;
+using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Infrastructure.Data;
+using Marten;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -10,11 +12,16 @@ namespace InvestmentHub.Infrastructure.Handlers.Commands;
 public class RecordSellTransactionHandler : IRequestHandler<RecordSellTransactionCommand, RecordSellTransactionResult>
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IDocumentSession _session;
     private readonly ILogger<RecordSellTransactionHandler> _logger;
 
-    public RecordSellTransactionHandler(ApplicationDbContext dbContext, ILogger<RecordSellTransactionHandler> logger)
+    public RecordSellTransactionHandler(
+        ApplicationDbContext dbContext,
+        IDocumentSession session,
+        ILogger<RecordSellTransactionHandler> logger)
     {
         _dbContext = dbContext;
+        _session = session;
         _logger = logger;
     }
 
@@ -22,8 +29,9 @@ public class RecordSellTransactionHandler : IRequestHandler<RecordSellTransactio
     {
         try
         {
-            var portfolioExists = await _dbContext.Portfolios.AnyAsync(p => p.Id == request.PortfolioId, cancellationToken);
-            if (!portfolioExists) return RecordSellTransactionResult.Failure("Portfolio not found");
+            // Validate portfolio exists using Marten read model
+            var portfolio = await _session.LoadAsync<PortfolioReadModel>(request.PortfolioId.Value, cancellationToken);
+            if (portfolio == null) return RecordSellTransactionResult.Failure($"Portfolio {request.PortfolioId.Value} not found");
 
             var totalBought = await _dbContext.Transactions
                 .Where(t => t.PortfolioId == request.PortfolioId && t.Symbol == request.Symbol && t.Type == Domain.Enums.TransactionType.BUY && t.Status == Domain.Enums.TransactionStatus.Active)

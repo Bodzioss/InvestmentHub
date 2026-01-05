@@ -83,6 +83,9 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            <Button variant="outline" onClick={() => router.push('/ai')}>
+              AI Analyst
+            </Button>
             <Button variant="outline" onClick={() => router.push('/profile')}>
               Profile
             </Button>

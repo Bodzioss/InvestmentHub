@@ -38,6 +38,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     /// </summary>
     public DbSet<InvestmentHub.Domain.Aggregates.Transaction> Transactions => Set<InvestmentHub.Domain.Aggregates.Transaction>();
 
+    /// <summary>
+    /// Gets or sets the FinancialReports DbSet for AI report library.
+    /// </summary>
+    public DbSet<FinancialReport> FinancialReports => Set<FinancialReport>();
+
+    /// <summary>
+    /// Gets or sets the DocumentChunks DbSet for AI vector search.
+    /// </summary>
+    public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
+
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -258,6 +268,41 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(c => c.FetchedAt)
                 .HasDatabaseName("IX_CachedMarketPrices_FetchedAt");
         });
+
+        // Configure FinancialReport entity (uses existing Instruments table)
+        builder.Entity<FinancialReport>(entity =>
+        {
+            entity.ToTable("FinancialReports");
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Year).IsRequired();
+            entity.Property(r => r.ReportType).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(r => r.FileName).HasMaxLength(500).IsRequired();
+            entity.Property(r => r.BlobUrl).HasMaxLength(2000).IsRequired();
+            entity.Property(r => r.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+
+            entity.HasOne(r => r.Instrument)
+                .WithMany()
+                .HasForeignKey(r => r.InstrumentId)
+                .OnDelete(DeleteBehavior.Restrict);  // Don't delete reports if instrument is deleted
+
+            entity.HasIndex(r => new { r.InstrumentId, r.Year, r.Quarter, r.ReportType }).IsUnique();
+        });
+
+        // Configure DocumentChunk entity with pgvector
+        builder.Entity<DocumentChunk>(entity =>
+        {
+            entity.ToTable("DocumentChunks");
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Content).IsRequired();
+            entity.Property(c => c.Embedding).HasColumnType("vector(768)");
+
+            entity.HasOne(c => c.Report)
+                .WithMany(r => r.Chunks)
+                .HasForeignKey(c => c.ReportId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(c => c.ReportId);
+        });
     }
 
     /// <summary>
@@ -269,5 +314,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     /// Gets or sets the CachedMarketPrices DbSet.
     /// </summary>
     public DbSet<CachedMarketPrice> CachedMarketPrices => Set<CachedMarketPrice>();
+
+    /// <summary>
+    /// Gets or sets the TreasuryBondDetails DbSet for Polish Treasury Bonds.
+    /// </summary>
+    public DbSet<TreasuryBondDetails> TreasuryBondDetails => Set<TreasuryBondDetails>();
+
+    /// <summary>
+    /// Gets or sets the InterestPeriods DbSet for bond interest tracking.
+    /// </summary>
+    public DbSet<InterestPeriod> InterestPeriods => Set<InterestPeriod>();
 }
 

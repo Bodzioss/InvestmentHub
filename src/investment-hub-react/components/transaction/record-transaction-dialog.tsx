@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Search, Plus, Minus, Wallet, Percent, Loader2 } from 'lucide-react'
+import { Search, Plus, Minus, Wallet, Percent, Loader2, Landmark, FileSpreadsheet } from 'lucide-react'
 import { z } from 'zod'
 import { useInstrumentSearch, useMarketPrice } from '@/lib/hooks'
 import { useRecordBuy, useRecordSell, useRecordDividend, useRecordInterest } from '@/lib/hooks/use-transactions'
 import { ASSET_TYPES, CURRENCIES } from '@/lib/constants'
 import type { Instrument } from '@/lib/types'
+import { getBondTypes, getBondSeries, type BondTypeInfo, type BondSeries } from '@/lib/api/bonds'
+import { ImportCsvDialog } from './import-csv-dialog'
 import {
     Dialog,
     DialogContent,
@@ -110,12 +112,41 @@ export function RecordTransactionDialog({ portfolioId, children, defaultTab = 'b
     const [selectedInstrument, setSelectedInstrument] = useState<Instrument | null>(null)
     const [popoverOpen, setPopoverOpen] = useState(false)
 
+    // Asset type and bond selection state
+    const [selectedAssetType, setSelectedAssetType] = useState<string>('Stock')
+    const [bondTypes, setBondTypes] = useState<BondTypeInfo[]>([])
+    const [bondSeries, setBondSeries] = useState<BondSeries[]>([])
+    const [selectedBondType, setSelectedBondType] = useState<string>('all')
+    const [selectedBondSeries, setSelectedBondSeries] = useState<BondSeries | null>(null)
+    const [bondPopoverOpen, setBondPopoverOpen] = useState(false)
+    const [bondSearchQuery, setBondSearchQuery] = useState('')
+
+    const isBond = selectedAssetType === 'Bond'
+
     const recordBuy = useRecordBuy()
     const recordSell = useRecordSell()
     const recordDividend = useRecordDividend()
     const recordInterest = useRecordInterest()
 
     const { data: instruments, isLoading: isSearching } = useInstrumentSearch(searchQuery)
+
+    // Load bond data when bond is selected
+    useEffect(() => {
+        if (open && isBond && bondTypes.length === 0) {
+            Promise.all([getBondTypes(), getBondSeries()])
+                .then(([types, series]) => {
+                    setBondTypes(types)
+                    setBondSeries(series)
+                })
+                .catch(console.error)
+        }
+    }, [open, isBond, bondTypes.length])
+
+    // Filter bond series by type
+    const filteredBondSeries = bondSeries.filter(
+        s => (selectedBondType === 'all' || s.type === selectedBondType) &&
+            (!bondSearchQuery || s.symbol.toLowerCase().includes(bondSearchQuery.toLowerCase()))
+    )
 
     // Fetch market price when instrument is selected
     const { data: marketPrice, isFetching: isFetchingPrice } = useMarketPrice(
@@ -181,6 +212,31 @@ export function RecordTransactionDialog({ portfolioId, children, defaultTab = 'b
         setSearchQuery('')
     }
 
+    function handleBondSeriesSelect(series: BondSeries, form: any) {
+        setSelectedBondSeries(series)
+        form.setValue('ticker', series.symbol)
+        form.setValue('exchange', 'PKO')
+        form.setValue('assetType', 'Bond')
+        form.setValue('pricePerUnit', 100) // Nominal value
+        form.setValue('currency', 'PLN')
+        setBondPopoverOpen(false)
+        setBondSearchQuery('')
+    }
+
+    function handleAssetTypeChange(type: string, form: any) {
+        setSelectedAssetType(type)
+        form.setValue('assetType', type)
+        if (type === 'Bond') {
+            form.setValue('currency', 'PLN')
+            form.setValue('exchange', 'PKO')
+            form.setValue('pricePerUnit', 100)
+            setSelectedInstrument(null)
+        } else {
+            setSelectedBondSeries(null)
+            setSelectedBondType('all')
+        }
+    }
+
     function onBuySubmit(data: BuyFormData) {
         recordBuy.mutate({ portfolioId, request: data }, {
             onSuccess: () => { setOpen(false); buyForm.reset(); setSelectedInstrument(null) }
@@ -206,6 +262,106 @@ export function RecordTransactionDialog({ portfolioId, children, defaultTab = 'b
     }
 
     const isPending = recordBuy.isPending || recordSell.isPending || recordDividend.isPending || recordInterest.isPending
+
+    const AssetTypeField = ({ form }: { form: any }) => (
+        <div className="space-y-2">
+            <label className="text-sm font-medium">Asset Type</label>
+            <Select value={selectedAssetType} onValueChange={(v) => handleAssetTypeChange(v, form)} disabled={isPending}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Select asset type" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="Stock">Stock</SelectItem>
+                    <SelectItem value="Bond">🏛️ Obligacje Skarbowe</SelectItem>
+                    <SelectItem value="ETF">ETF</SelectItem>
+                    <SelectItem value="Commodity">Commodity</SelectItem>
+                    <SelectItem value="Cryptocurrency">Cryptocurrency</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+    )
+
+    const BondSeriesField = ({ form }: { form: any }) => (
+        <div className="space-y-3">
+            {/* Bond Type Selector */}
+            <div className="space-y-2">
+                <label className="text-sm font-medium">Typ obligacji</label>
+                <Select value={selectedBondType} onValueChange={setSelectedBondType} disabled={isPending}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Wszystkie typy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Wszystkie typy</SelectItem>
+                        {bondTypes.map((type) => (
+                            <SelectItem key={type.code} value={type.code}>
+                                {type.code} - {type.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {/* Bond Series Search */}
+            <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                    <Landmark className="h-4 w-4" /> Wybierz emisję
+                </label>
+                <Popover open={bondPopoverOpen} onOpenChange={setBondPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" className="w-full justify-between" disabled={isPending}>
+                            {selectedBondSeries
+                                ? `${selectedBondSeries.symbol} - ${new Date(selectedBondSeries.maturityDate).toLocaleDateString('pl-PL')}`
+                                : 'Wyszukaj serię obligacji...'}
+                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[450px] p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+                        <div className="p-2 border-b">
+                            <Input
+                                placeholder="Wpisz symbol (np. EDO0136)..."
+                                value={bondSearchQuery}
+                                onChange={(e) => setBondSearchQuery(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                        <Command shouldFilter={false}>
+                            <CommandList className="max-h-[300px]">
+                                <CommandEmpty>
+                                    {bondSeries.length === 0 ? 'Ładowanie serii...' : 'Nie znaleziono serii.'}
+                                </CommandEmpty>
+                                {filteredBondSeries.length > 0 && (
+                                    <CommandGroup>
+                                        {filteredBondSeries.slice(0, 50).map((s) => (
+                                            <CommandItem key={s.symbol} value={s.symbol} onSelect={() => handleBondSeriesSelect(s, form)}>
+                                                <div className="flex flex-col w-full">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-mono font-semibold">{s.symbol}</span>
+                                                        <Badge variant="outline">{s.type}</Badge>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm text-muted-foreground">
+                                                        <span>Zapadalność: {new Date(s.maturityDate).toLocaleDateString('pl-PL')}</span>
+                                                        <span>{s.firstYearRate}%</span>
+                                                    </div>
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                )}
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
+                {selectedBondSeries && (
+                    <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+                        <p><strong>Seria:</strong> {selectedBondSeries.symbol}</p>
+                        <p><strong>Oprocentowanie I rok:</strong> {selectedBondSeries.firstYearRate}%</p>
+                        <p><strong>Marża:</strong> {selectedBondSeries.margin}%</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
 
     const InstrumentSearchField = ({ form }: { form: any }) => (
         <div className="space-y-2">
@@ -262,9 +418,19 @@ export function RecordTransactionDialog({ portfolioId, children, defaultTab = 'b
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>{children}</DialogTrigger>
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Record Transaction</DialogTitle>
-                    <DialogDescription>Add a new transaction to your portfolio.</DialogDescription>
+                <DialogHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <DialogTitle>Record Transaction</DialogTitle>
+                        <DialogDescription>Add a new transaction to your portfolio.</DialogDescription>
+                    </div>
+                    <div className="flex items-center gap-2 mr-6">
+                        <ImportCsvDialog portfolioId={portfolioId}>
+                            <Button variant="outline" size="sm" className="flex items-center gap-2">
+                                <FileSpreadsheet className="h-4 w-4" />
+                                Import MyFund CSV
+                            </Button>
+                        </ImportCsvDialog>
+                    </div>
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
@@ -287,7 +453,12 @@ export function RecordTransactionDialog({ portfolioId, children, defaultTab = 'b
                     <TabsContent value="buy">
                         <Form {...buyForm}>
                             <form onSubmit={buyForm.handleSubmit(onBuySubmit)} className="space-y-4">
-                                <InstrumentSearchField form={buyForm} />
+                                <AssetTypeField form={buyForm} />
+                                {isBond ? (
+                                    <BondSeriesField form={buyForm} />
+                                ) : (
+                                    <InstrumentSearchField form={buyForm} />
+                                )}
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <FormField control={buyForm.control} name="quantity" render={({ field }) => (
                                         <FormItem>

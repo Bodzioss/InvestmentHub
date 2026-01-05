@@ -1,6 +1,7 @@
 using InvestmentHub.Domain.Entities;
 using InvestmentHub.Domain.Interfaces;
 using InvestmentHub.Domain.Repositories;
+using InvestmentHub.Infrastructure.MarketData;
 using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Infrastructure.Services;
@@ -11,16 +12,16 @@ namespace InvestmentHub.Infrastructure.Services;
 /// </summary>
 public class MarketPriceService
 {
-    private readonly IMarketDataProvider _marketDataProvider;
+    private readonly IEnumerable<IMarketDataProvider> _marketDataProviders;
     private readonly IMarketPriceRepository _priceRepository;
     private readonly ILogger<MarketPriceService> _logger;
 
     public MarketPriceService(
-        IMarketDataProvider marketDataProvider,
+        IEnumerable<IMarketDataProvider> marketDataProviders,
         IMarketPriceRepository priceRepository,
         ILogger<MarketPriceService> logger)
     {
-        _marketDataProvider = marketDataProvider;
+        _marketDataProviders = marketDataProviders;
         _priceRepository = priceRepository;
         _logger = logger;
     }
@@ -28,15 +29,15 @@ public class MarketPriceService
     /// <summary>
     /// Gets current price for a symbol, using cached price if available today.
     /// </summary>
-    public async Task<MarketPrice?> GetCurrentPriceAsync(string symbol, CancellationToken cancellationToken = default)
+    public async Task<MarketPrice?> GetCurrentPriceAsync(Domain.ValueObjects.Symbol symbol, CancellationToken cancellationToken = default)
     {
         try
         {
             // 1. Check if we have today's price in cache
-            var cachedPrice = await _priceRepository.GetTodaysPriceAsync(symbol, cancellationToken);
+            var cachedPrice = await _priceRepository.GetTodaysPriceAsync(symbol.Ticker, cancellationToken);
             if (cachedPrice != null)
             {
-                _logger.LogDebug("Using cached price for {Symbol} from {FetchedAt}", symbol, cachedPrice.FetchedAt);
+                _logger.LogDebug("Using cached price for {Symbol} from {FetchedAt}", symbol.Ticker, cachedPrice.FetchedAt);
                 return new MarketPrice
                 {
                     Symbol = cachedPrice.Symbol,
@@ -47,20 +48,31 @@ public class MarketPriceService
                 };
             }
 
-            // 2. No cache hit, fetch from external provider
-            _logger.LogInformation("No cached price for {Symbol}, fetching from provider", symbol);
-            var livePrice = await _marketDataProvider.GetLatestPriceAsync(symbol, cancellationToken);
+            // 2. No cache hit, fetch from external providers
+            _logger.LogInformation("No cached price for {Symbol}, fetching from providers", symbol.Ticker);
+
+            MarketPrice? livePrice = null;
+
+            // Prioritize providers: Stooq first for Polish/Catalyst, Yahoo for others
+            var orderedProviders = _marketDataProviders.OrderBy(p =>
+                p is StooqMarketDataProvider && (symbol.Exchange == "GPW" || symbol.Exchange == "Catalyst" || symbol.Exchange == "NewConnect" || symbol.Exchange == "WSE" || symbol.Exchange == "WAR") ? 0 : 1);
+
+            foreach (var provider in orderedProviders)
+            {
+                livePrice = await provider.GetLatestPriceAsync(symbol, cancellationToken);
+                if (livePrice != null) break;
+            }
 
             if (livePrice == null)
             {
-                _logger.LogWarning("Failed to fetch price for {Symbol} from provider", symbol);
+                _logger.LogWarning("Failed to fetch price for {Symbol} from any provider", symbol.Ticker);
 
                 // Fallback: try to get most recent cached price (even if old)
-                var fallbackPrice = await _priceRepository.GetLatestPriceAsync(symbol, cancellationToken);
+                var fallbackPrice = await _priceRepository.GetLatestPriceAsync(symbol.Ticker, cancellationToken);
                 if (fallbackPrice != null)
                 {
                     _logger.LogInformation("Using fallback cached price for {Symbol} from {FetchedAt}",
-                        symbol, fallbackPrice.FetchedAt);
+                        symbol.Ticker, fallbackPrice.FetchedAt);
                     return new MarketPrice
                     {
                         Symbol = fallbackPrice.Symbol,
@@ -76,12 +88,12 @@ public class MarketPriceService
 
             // 3. Save to cache for future use
             _logger.LogDebug("Caching price for {Symbol}: {Price} {Currency}",
-                symbol, livePrice.Price, livePrice.Currency);
+                symbol.Ticker, livePrice.Price, livePrice.Currency);
 
             await _priceRepository.SavePriceAsync(new CachedMarketPrice
             {
                 Id = Guid.NewGuid(),
-                Symbol = symbol,
+                Symbol = symbol.Ticker,
                 Price = livePrice.Price,
                 Currency = livePrice.Currency,
                 FetchedAt = DateTime.UtcNow,
@@ -92,13 +104,13 @@ public class MarketPriceService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error fetching price for {Symbol}", symbol);
+            _logger.LogError(ex, "Error fetching price for {Symbol}", symbol.Ticker);
 
             // Try fallback to cached price
-            var fallbackPrice = await _priceRepository.GetLatestPriceAsync(symbol, cancellationToken);
+            var fallbackPrice = await _priceRepository.GetLatestPriceAsync(symbol.Ticker, cancellationToken);
             if (fallbackPrice != null)
             {
-                _logger.LogInformation("Using fallback cached price for {Symbol} after error", symbol);
+                _logger.LogInformation("Using fallback cached price for {Symbol} after error", symbol.Ticker);
                 return new MarketPrice
                 {
                     Symbol = fallbackPrice.Symbol,
@@ -118,26 +130,26 @@ public class MarketPriceService
     /// Useful for manual refresh operations.
     /// Checks if today's price already exists to avoid duplicates.
     /// </summary>
-    public async Task<MarketPrice?> ForceRefreshPriceAsync(string symbol, CancellationToken cancellationToken = default)
+    public async Task<MarketPrice?> ForceRefreshPriceAsync(Domain.ValueObjects.Symbol symbol, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Force refreshing price for {Symbol}", symbol);
+        _logger.LogInformation("Force refreshing price for {Symbol}", symbol.Ticker);
 
-        // Check if we already have today's price to avoid duplicates
-        var todaysPrice = await _priceRepository.GetTodaysPriceAsync(symbol, cancellationToken);
-        if (todaysPrice != null)
+        // FORCE REFRESH - bypasses cache for ALL instruments!
+        // Always fetches from external provider, regardless of whether today's data exists.
+        // Provider prioritization: Stooq first for Polish exchanges, Yahoo for others
+        var orderedProviders = _marketDataProviders.OrderBy(p =>
+            p is StooqMarketDataProvider &&
+            (symbol.Exchange == "GPW" || symbol.Exchange == "Catalyst" ||
+             symbol.Exchange == "NewConnect" || symbol.Exchange == "WSE" || symbol.Exchange == "WAR")
+            ? 0 : 1);
+
+        MarketPrice? livePrice = null;
+        foreach (var provider in orderedProviders)
         {
-            _logger.LogDebug("Today's price already exists for {Symbol}, skipping duplicate fetch", symbol);
-            return new MarketPrice
-            {
-                Symbol = todaysPrice.Symbol,
-                Price = todaysPrice.Price,
-                Currency = todaysPrice.Currency,
-                Timestamp = todaysPrice.FetchedAt,
-                Source = todaysPrice.Source
-            };
+            livePrice = await provider.GetLatestPriceAsync(symbol, cancellationToken);
+            if (livePrice != null) break;
         }
 
-        var livePrice = await _marketDataProvider.GetLatestPriceAsync(symbol, cancellationToken);
         if (livePrice == null)
         {
             return null;
@@ -146,7 +158,7 @@ public class MarketPriceService
         await _priceRepository.SavePriceAsync(new CachedMarketPrice
         {
             Id = Guid.NewGuid(),
-            Symbol = symbol,
+            Symbol = symbol.Ticker,
             Price = livePrice.Price,
             Currency = livePrice.Currency,
             FetchedAt = DateTime.UtcNow,
@@ -154,6 +166,99 @@ public class MarketPriceService
         }, cancellationToken);
 
         return livePrice;
+    }
+
+    /// <summary>
+    /// Gets historical prices for a symbol.
+    /// tries all providers until one returns data (Yahoo is prioritized for history).
+    /// </summary>
+    public async Task<IEnumerable<MarketPrice>> GetHistoricalPricesAsync(Domain.ValueObjects.Symbol symbol, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+    {
+        // Try all providers until one returns data. 
+        // Yahoo is currently the only one with full historical support in this implementation.
+        var orderedProviders = _marketDataProviders.OrderBy(p => p is YahooMarketDataProvider ? 0 : 1);
+
+        foreach (var provider in orderedProviders)
+        {
+            try
+            {
+                var history = await provider.GetHistoricalPricesAsync(symbol, from, to, cancellationToken);
+                var historyList = history.ToList();
+                if (historyList.Any()) return historyList;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error fetching historical prices for {Symbol} from {Provider}", symbol.Ticker, provider.GetType().Name);
+            }
+        }
+
+        return Enumerable.Empty<MarketPrice>();
+    }
+
+    /// <summary>
+    /// Forces a fresh fetch from the provider and returns detailed logs of the process.
+    /// </summary>
+    public async Task<(MarketPrice? Price, List<string> Logs)> ForceRefreshPriceWithLogsAsync(Domain.ValueObjects.Symbol symbol, CancellationToken cancellationToken = default)
+    {
+        var logs = new List<string>();
+        logs.Add($"[{DateTime.Now:T}] Starting force refresh for {symbol.Ticker} ({symbol.Exchange}, {symbol.AssetType})");
+
+        try
+        {
+            MarketPrice? livePrice = null;
+
+            // Prioritize providers: Stooq first for Polish/Catalyst, Yahoo for others
+            var orderedProviders = _marketDataProviders.OrderBy(p =>
+                p is StooqMarketDataProvider && (symbol.Exchange == "GPW" || symbol.Exchange == "Catalyst" || symbol.Exchange == "NewConnect" || symbol.Exchange == "WSE" || symbol.Exchange == "WAR") ? 0 : 1);
+
+            foreach (var provider in orderedProviders)
+            {
+                var providerName = provider.GetType().Name;
+                logs.Add($"[{DateTime.Now:T}] Trying provider: {providerName}");
+
+                try
+                {
+                    livePrice = await provider.GetLatestPriceAsync(symbol, cancellationToken, logs);
+                    if (livePrice != null)
+                    {
+                        logs.Add($"[{DateTime.Now:T}] Success from {providerName}: {livePrice.Price} {livePrice.Currency}");
+                        break;
+                    }
+                    else
+                    {
+                        logs.Add($"[{DateTime.Now:T}] Provider {providerName} returned no data.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logs.Add($"[{DateTime.Now:T}] ERROR from {providerName}: {ex.Message}");
+                }
+            }
+
+            if (livePrice != null)
+            {
+                logs.Add($"[{DateTime.Now:T}] Updating cache with fresh price.");
+                await _priceRepository.SavePriceAsync(new CachedMarketPrice
+                {
+                    Id = Guid.NewGuid(),
+                    Symbol = symbol.Ticker,
+                    Price = livePrice.Price,
+                    Currency = livePrice.Currency,
+                    FetchedAt = DateTime.UtcNow,
+                    Source = livePrice.Source
+                }, cancellationToken);
+
+                return (livePrice, logs);
+            }
+
+            logs.Add($"[{DateTime.Now:T}] Failed to fetch price from any provider.");
+            return (null, logs);
+        }
+        catch (Exception ex)
+        {
+            logs.Add($"[{DateTime.Now:T}] CRITICAL ERROR: {ex.Message}");
+            return (null, logs);
+        }
     }
 
     /// <summary>

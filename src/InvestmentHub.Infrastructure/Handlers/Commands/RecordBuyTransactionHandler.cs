@@ -70,6 +70,7 @@ public class RecordBuyTransactionHandler : IRequestHandler<RecordBuyTransactionC
         {
             _logger.LogError(ex, "Failed to record BUY transaction for portfolio {PortfolioId}",
                 request.PortfolioId.Value);
+            _dbContext.ChangeTracker.Clear();
             return RecordBuyTransactionResult.Failure($"Failed to record transaction: {ex.Message}");
         }
     }

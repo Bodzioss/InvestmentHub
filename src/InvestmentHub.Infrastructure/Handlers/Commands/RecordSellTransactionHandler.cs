@@ -34,11 +34,19 @@ public class RecordSellTransactionHandler : IRequestHandler<RecordSellTransactio
             if (portfolio == null) return RecordSellTransactionResult.Failure($"Portfolio {request.PortfolioId.Value} not found");
 
             var totalBought = await _dbContext.Transactions
-                .Where(t => t.PortfolioId == request.PortfolioId && t.Symbol == request.Symbol && t.Type == Domain.Enums.TransactionType.BUY && t.Status == Domain.Enums.TransactionStatus.Active)
+                .Where(t => t.PortfolioId == request.PortfolioId &&
+                            t.Symbol.Ticker == request.Symbol.Ticker &&
+                            t.Symbol.Exchange == request.Symbol.Exchange &&
+                            t.Type == Domain.Enums.TransactionType.BUY &&
+                            t.Status == Domain.Enums.TransactionStatus.Active)
                 .SumAsync(t => t.Quantity ?? 0, cancellationToken);
 
             var totalSold = await _dbContext.Transactions
-                .Where(t => t.PortfolioId == request.PortfolioId && t.Symbol == request.Symbol && t.Type == Domain.Enums.TransactionType.SELL && t.Status == Domain.Enums.TransactionStatus.Active)
+                .Where(t => t.PortfolioId == request.PortfolioId &&
+                            t.Symbol.Ticker == request.Symbol.Ticker &&
+                            t.Symbol.Exchange == request.Symbol.Exchange &&
+                            t.Type == Domain.Enums.TransactionType.SELL &&
+                            t.Status == Domain.Enums.TransactionStatus.Active)
                 .SumAsync(t => t.Quantity ?? 0, cancellationToken);
 
             if (totalBought - totalSold < request.Quantity)
@@ -53,6 +61,7 @@ public class RecordSellTransactionHandler : IRequestHandler<RecordSellTransactio
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to record SELL transaction");
+            _dbContext.ChangeTracker.Clear();
             return RecordSellTransactionResult.Failure($"Failed: {ex.Message}");
         }
     }

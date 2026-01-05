@@ -89,7 +89,7 @@ public static class DatabaseSeeder
                 // Create a NEW scope for the background thread
                 using var bgScope = serviceProvider.CreateScope();
                 var bgContext = bgScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                
+
                 var importer = new InstrumentImporter(bgContext, yahooQuotes);
                 var instrumentFilePath = Path.Combine(AppContext.BaseDirectory, "all_instruments_list.json");
 
@@ -109,7 +109,14 @@ public static class DatabaseSeeder
                     Console.WriteLine("Starting background import of Global instruments...");
                     await importer.ImportGlobalAsync(globalInstrumentFilePath);
                 }
-                
+
+                var etfsFilePath = Path.Combine(AppContext.BaseDirectory, "ETFsList.csv");
+                if (File.Exists(etfsFilePath))
+                {
+                    Console.WriteLine("Starting background import of ETFs from CSV...");
+                    await importer.ImportEtfsCsvAsync(etfsFilePath);
+                }
+
                 Console.WriteLine("Background instrument import completed.");
             }
             catch (Exception ex)

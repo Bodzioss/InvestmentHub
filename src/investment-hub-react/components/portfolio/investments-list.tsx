@@ -5,10 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PriceCacheDialog } from './price-cache-dialog'
+import { PriceDiagnosticsDialog } from './price-diagnostics-dialog'
 import { UpdateInvestmentDialog } from '../investment/update-investment-dialog'
 import { SellInvestmentDialog } from '../investment/sell-investment-dialog'
 import type { Investment } from '@/lib/types'
-import { Pencil, TrendingDown } from 'lucide-react'
+import { Pencil, TrendingDown, RefreshCw } from 'lucide-react'
 
 interface InvestmentsListProps {
     investments: Investment[]
@@ -86,6 +87,7 @@ export function InvestmentsList({ investments, isLoading }: InvestmentsListProps
                                                 {investment.symbol.assetType}
                                             </Badge>
                                             <PriceCacheDialog symbol={investment.symbol.ticker} />
+                                            <PriceDiagnosticsDialog symbol={investment.symbol.ticker} />
                                         </div>
                                         <div className="text-sm text-muted-foreground mt-1">
                                             {investment.quantity} shares @ {investment.purchasePrice.amount.toFixed(2)} {investment.purchasePrice.currency}

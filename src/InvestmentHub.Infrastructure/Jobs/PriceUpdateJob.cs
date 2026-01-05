@@ -26,27 +26,30 @@ public class PriceUpdateJob
 
         // 1. Get all unique symbols from active investments
         var investments = await _investmentRepository.GetAllAsync(CancellationToken.None);
-        var tickers = investments.Select(i => i.Symbol.Ticker).Distinct().ToList();
+        var symbols = investments.Select(i => i.Symbol)
+            .GroupBy(s => new { s.Ticker, s.Exchange })
+            .Select(g => g.First())
+            .ToList();
 
-        _logger.LogInformation("Found {Count} unique symbols to update", tickers.Count);
+        _logger.LogInformation("Found {Count} unique symbols to update", symbols.Count);
 
-        foreach (var ticker in tickers)
+        foreach (var symbol in symbols)
         {
             try
             {
                 // 2. Fetch price using smart caching service
                 // This will use cached price if already fetched today
-                var price = await _marketPriceService.GetCurrentPriceAsync(ticker, CancellationToken.None);
+                var price = await _marketPriceService.GetCurrentPriceAsync(symbol, CancellationToken.None);
 
                 if (price != null)
                 {
                     _logger.LogDebug("Processed price for {Symbol}: {Price} {Currency}",
-                        ticker, price.Price, price.Currency);
+                        symbol.Ticker, price.Price, price.Currency);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to update price for {Symbol}", ticker);
+                _logger.LogError(ex, "Failed to update price for {Symbol}", symbol.Ticker);
             }
         }
 

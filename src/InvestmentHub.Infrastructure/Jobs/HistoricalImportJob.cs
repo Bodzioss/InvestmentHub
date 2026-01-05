@@ -1,6 +1,10 @@
 using InvestmentHub.Domain.Entities;
+using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.Interfaces;
+using InvestmentHub.Domain.ValueObjects;
+using InvestmentHub.Infrastructure.Data;
 using Marten;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Infrastructure.Jobs;
@@ -8,22 +12,29 @@ namespace InvestmentHub.Infrastructure.Jobs;
 public class HistoricalImportJob
 {
     private readonly IDocumentStore _documentStore;
+    private readonly ApplicationDbContext _dbContext;
     private readonly IMarketDataProvider _marketDataProvider;
     private readonly ILogger<HistoricalImportJob> _logger;
 
     public HistoricalImportJob(
         IDocumentStore documentStore,
+        ApplicationDbContext dbContext,
         IMarketDataProvider marketDataProvider,
-        ILogger<HistoricalImportJob> _logger)
+        ILogger<HistoricalImportJob> logger)
     {
         _documentStore = documentStore;
+        _dbContext = dbContext;
         _marketDataProvider = marketDataProvider;
-        this._logger = _logger;
+        _logger = logger;
     }
 
-    public async Task ImportHistoryAsync(string symbol)
+    public async Task ImportHistoryAsync(string ticker)
     {
-        _logger.LogInformation("Starting HistoricalImportJob for {Symbol}...", symbol);
+        _logger.LogInformation("Starting HistoricalImportJob for {Symbol}...", ticker);
+
+        // Try to find instrument to get symbol context
+        var instrument = await EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(_dbContext.Instruments, i => i.Symbol.Ticker == ticker);
+        var symbol = instrument?.Symbol ?? new Symbol(ticker, "GPW", AssetType.Stock);
 
         // 1. Fetch 5 years of history
         var to = DateTime.UtcNow;
@@ -51,8 +62,8 @@ public class HistoricalImportJob
         // OR: Check existence.
         // Let's go with: Delete existing history for this symbol and insert new.
         // This is safe for a "Import" job.
-        
-        session.DeleteWhere<PriceHistory>(x => x.Symbol == symbol);
+
+        session.DeleteWhere<PriceHistory>(x => x.Symbol == ticker);
 
         var priceHistoryRecords = historyList.Select(h => new PriceHistory
         {

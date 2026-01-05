@@ -1,7 +1,8 @@
 import apiClient from './client'
 import type {
     MarketPrice,
-    PriceHistory
+    PriceHistory,
+    MarketPriceRefreshResult
 } from '../types'
 
 // ============================================
@@ -31,6 +32,16 @@ export async function getPriceHistory(
         {
             params: { days }
         }
+    )
+    return response.data
+}
+
+/**
+ * Trace market price fetch process with logs
+ */
+export async function tracePrice(symbol: string): Promise<MarketPriceRefreshResult> {
+    const response = await apiClient.post<MarketPriceRefreshResult>(
+        `/api/market/trace/${symbol}`
     )
     return response.data
 }

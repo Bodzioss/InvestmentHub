@@ -117,6 +117,16 @@ export interface MarketPrice {
     volume?: number
 }
 
+export interface MarketPriceRefreshResult {
+    symbol: string
+    price?: number
+    currency?: string
+    timestamp?: string
+    source?: string
+    traceLogs: string[]
+    success: boolean
+}
+
 // ============================================
 // USER TYPES
 // ============================================

@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Search } from 'lucide-react'
+import { Search, Landmark } from 'lucide-react'
 import { useAddInvestment, useInstrumentSearch, useMarketPrice } from '@/lib/hooks'
 import { addInvestmentSchema, type AddInvestmentFormData } from '@/lib/validation'
 import { ASSET_TYPES, CURRENCIES } from '@/lib/constants'
 import type { Instrument } from '@/lib/types'
+import { getBondTypes, getBondSeries, type BondTypeInfo, type BondSeries } from '@/lib/api/bonds'
 import {
     Dialog,
     DialogContent,
@@ -60,6 +61,14 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
     const [selectedInstrument, setSelectedInstrument] = useState<Instrument | null>(null)
     const [instrumentPopoverOpen, setInstrumentPopoverOpen] = useState(false)
 
+    // Bond-specific state
+    const [bondTypes, setBondTypes] = useState<BondTypeInfo[]>([])
+    const [bondSeries, setBondSeries] = useState<BondSeries[]>([])
+    const [selectedBondType, setSelectedBondType] = useState<string>('')
+    const [selectedBondSeries, setSelectedBondSeries] = useState<BondSeries | null>(null)
+    const [bondSeriesPopoverOpen, setBondSeriesPopoverOpen] = useState(false)
+    const [bondSeriesSearch, setBondSeriesSearch] = useState('')
+
     const addInvestment = useAddInvestment()
 
     const form = useForm<AddInvestmentFormData>({
@@ -75,28 +84,62 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
         },
     })
 
-    //  Watch asset type for filtering
+    // Watch asset type for conditional rendering
     const assetType = form.watch('assetType')
+    const isBond = assetType === 'Bond'
 
-    // Search instruments
+    // Load bond data when dialog opens and Bond is selected
+    useEffect(() => {
+        if (open && isBond && bondTypes.length === 0) {
+            Promise.all([getBondTypes(), getBondSeries()])
+                .then(([types, series]) => {
+                    setBondTypes(types)
+                    setBondSeries(series)
+                })
+                .catch(console.error)
+        }
+    }, [open, isBond, bondTypes.length])
+
+    // Filter bond series by selected type
+    const filteredBondSeries = bondSeries.filter(
+        s => !selectedBondType || s.type === selectedBondType
+    ).filter(
+        s => !bondSeriesSearch ||
+            s.symbol.toLowerCase().includes(bondSeriesSearch.toLowerCase())
+    )
+
+    // Search instruments (for non-bond assets)
     const { data: instruments, isLoading: isSearching } = useInstrumentSearch(
         searchQuery,
-        { assetType }
+        { assetType: isBond ? undefined : assetType }
     )
 
     // Fetch market price when instrument selected
     const { data: priceData, isFetching: isFetchingPrice } = useMarketPrice(
         selectedInstrument?.ticker,
-        !!selectedInstrument
+        !!selectedInstrument && !isBond
     )
 
     // Auto-fill price when fetched
     useEffect(() => {
-        if (priceData) {
+        if (priceData && !isBond) {
             form.setValue('purchasePrice', priceData.price)
             form.setValue('purchaseCurrency', priceData.currency)
         }
-    }, [priceData, form])
+    }, [priceData, form, isBond])
+
+    // Reset bond selection when switching asset types
+    useEffect(() => {
+        if (!isBond) {
+            setSelectedBondType('')
+            setSelectedBondSeries(null)
+        } else {
+            setSelectedInstrument(null)
+            form.setValue('purchasePrice', 100) // Bond nominal value
+            form.setValue('purchaseCurrency', 'PLN')
+            form.setValue('exchange', 'PKO')
+        }
+    }, [isBond, form])
 
     function handleInstrumentSelect(instrument: Instrument) {
         setSelectedInstrument(instrument)
@@ -104,6 +147,16 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
         form.setValue('exchange', instrument.exchange)
         form.setValue('assetType', instrument.assetType)
         setInstrumentPopoverOpen(false)
+    }
+
+    function handleBondSeriesSelect(series: BondSeries) {
+        setSelectedBondSeries(series)
+        form.setValue('ticker', series.symbol)
+        form.setValue('exchange', 'PKO')
+        form.setValue('assetType', 'Bond')
+        form.setValue('purchasePrice', 100) // Bonds always nominal 100 PLN
+        form.setValue('purchaseCurrency', 'PLN')
+        setBondSeriesPopoverOpen(false)
     }
 
     function onSubmit(data: AddInvestmentFormData) {
@@ -129,11 +182,17 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                     setOpen(false)
                     form.reset()
                     setSelectedInstrument(null)
+                    setSelectedBondSeries(null)
+                    setSelectedBondType('')
                     setSearchQuery('')
+                    setBondSeriesSearch('')
                 },
             }
         )
     }
+
+    const formatDate = (dateStr: string) =>
+        new Date(dateStr).toLocaleDateString('pl-PL')
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -144,7 +203,9 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                 <DialogHeader>
                     <DialogTitle>Add Investment</DialogTitle>
                     <DialogDescription>
-                        Search for an instrument and add it to your portfolio.
+                        {isBond
+                            ? 'Select a Polish Treasury Bond series to add to your portfolio.'
+                            : 'Search for an instrument and add it to your portfolio.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -159,7 +220,7 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                                     <FormLabel>Asset Type</FormLabel>
                                     <Select
                                         onValueChange={field.onChange}
-                                        defaultValue={field.value}
+                                        value={field.value}
                                         disabled={addInvestment.isPending}
                                     >
                                         <FormControl>
@@ -170,7 +231,7 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                                         <SelectContent>
                                             {Object.values(ASSET_TYPES).map((type) => (
                                                 <SelectItem key={type} value={type}>
-                                                    {type}
+                                                    {type === 'Bond' ? '🏛️ Obligacje Skarbowe' : type}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -180,65 +241,175 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                             )}
                         />
 
-                        {/* Instrument Search Autocomplete */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Search Instrument</label>
-                            <Popover open={instrumentPopoverOpen} onOpenChange={setInstrumentPopoverOpen}>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        className="w-full justify-between"
+                        {/* BOND-SPECIFIC FIELDS */}
+                        {isBond && (
+                            <>
+                                {/* Bond Type Selector */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Typ obligacji</label>
+                                    <Select
+                                        value={selectedBondType}
+                                        onValueChange={setSelectedBondType}
                                         disabled={addInvestment.isPending}
                                     >
-                                        {selectedInstrument
-                                            ? `${selectedInstrument.ticker} - ${selectedInstrument.name}`
-                                            : 'Search by ticker or name...'}
-                                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[400px] p-0">
-                                    <Command>
-                                        <CommandInput
-                                            placeholder="Type ticker or name..."
-                                            value={searchQuery}
-                                            onValueChange={setSearchQuery}
-                                        />
-                                        <CommandList>
-                                            <CommandEmpty>
-                                                {isSearching ? 'Searching...' : 'No instruments found.'}
-                                            </CommandEmpty>
-                                            {instruments && instruments.length > 0 && (
-                                                <CommandGroup>
-                                                    {instruments.map((instrument) => (
-                                                        <CommandItem
-                                                            key={instrument.id}
-                                                            value={instrument.ticker}
-                                                            onSelect={() => handleInstrumentSelect(instrument)}
-                                                        >
-                                                            <div className="flex flex-col">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-semibold">{instrument.ticker}</span>
-                                                                    <Badge variant="secondary" className="text-xs">
-                                                                        {instrument.assetType}
-                                                                    </Badge>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Wybierz typ obligacji" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">Wszystkie typy</SelectItem>
+                                            {bondTypes.map((type) => (
+                                                <SelectItem key={type.code} value={type.code}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono">{type.code}</span>
+                                                        <span className="text-muted-foreground">
+                                                            - {type.name}
+                                                        </span>
+                                                        {type.isInflationIndexed && (
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                Indeksowane
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Bond Series Selector */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <Landmark className="h-4 w-4" />
+                                        Wybierz emisję
+                                    </label>
+                                    <Popover open={bondSeriesPopoverOpen} onOpenChange={setBondSeriesPopoverOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                className="w-full justify-between"
+                                                disabled={addInvestment.isPending}
+                                            >
+                                                {selectedBondSeries
+                                                    ? `${selectedBondSeries.symbol} - Zapadalność: ${formatDate(selectedBondSeries.maturityDate)}`
+                                                    : 'Wyszukaj serię obligacji...'}
+                                                <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[450px] p-0">
+                                            <Command>
+                                                <CommandInput
+                                                    placeholder="Wpisz symbol (np. EDO0136)..."
+                                                    value={bondSeriesSearch}
+                                                    onValueChange={setBondSeriesSearch}
+                                                />
+                                                <CommandList className="max-h-[300px]">
+                                                    <CommandEmpty>
+                                                        {bondSeries.length === 0
+                                                            ? 'Ładowanie serii...'
+                                                            : 'Nie znaleziono serii.'}
+                                                    </CommandEmpty>
+                                                    {filteredBondSeries.length > 0 && (
+                                                        <CommandGroup>
+                                                            {filteredBondSeries.slice(0, 50).map((series) => (
+                                                                <CommandItem
+                                                                    key={series.instrumentId}
+                                                                    value={series.symbol}
+                                                                    onSelect={() => handleBondSeriesSelect(series)}
+                                                                >
+                                                                    <div className="flex flex-col w-full">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="font-mono font-semibold">
+                                                                                {series.symbol}
+                                                                            </span>
+                                                                            <Badge variant="outline">{series.type}</Badge>
+                                                                        </div>
+                                                                        <div className="flex justify-between text-sm text-muted-foreground">
+                                                                            <span>Zapadalność: {formatDate(series.maturityDate)}</span>
+                                                                            <span>{series.firstYearRate}% / rok</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    )}
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
+                                    {selectedBondSeries && (
+                                        <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+                                            <p><strong>Seria:</strong> {selectedBondSeries.symbol}</p>
+                                            <p><strong>Oprocentowanie I rok:</strong> {selectedBondSeries.firstYearRate}%</p>
+                                            <p><strong>Marża:</strong> {selectedBondSeries.margin}%</p>
+                                            <p><strong>Zapadalność:</strong> {formatDate(selectedBondSeries.maturityDate)}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+
+                        {/* NON-BOND INSTRUMENT SEARCH */}
+                        {!isBond && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Search Instrument</label>
+                                <Popover open={instrumentPopoverOpen} onOpenChange={setInstrumentPopoverOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            className="w-full justify-between"
+                                            disabled={addInvestment.isPending}
+                                        >
+                                            {selectedInstrument
+                                                ? `${selectedInstrument.ticker} - ${selectedInstrument.name}`
+                                                : 'Search by ticker or name...'}
+                                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[400px] p-0">
+                                        <Command>
+                                            <CommandInput
+                                                placeholder="Type ticker or name..."
+                                                value={searchQuery}
+                                                onValueChange={setSearchQuery}
+                                            />
+                                            <CommandList>
+                                                <CommandEmpty>
+                                                    {isSearching ? 'Searching...' : 'No instruments found.'}
+                                                </CommandEmpty>
+                                                {instruments && instruments.length > 0 && (
+                                                    <CommandGroup>
+                                                        {instruments.map((instrument) => (
+                                                            <CommandItem
+                                                                key={instrument.id}
+                                                                value={instrument.ticker}
+                                                                onSelect={() => handleInstrumentSelect(instrument)}
+                                                            >
+                                                                <div className="flex flex-col">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-semibold">{instrument.ticker}</span>
+                                                                        <Badge variant="secondary" className="text-xs">
+                                                                            {instrument.assetType}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <span className="text-sm text-muted-foreground">
+                                                                        {instrument.name} ({instrument.exchange})
+                                                                    </span>
                                                                 </div>
-                                                                <span className="text-sm text-muted-foreground">
-                                                                    {instrument.name} ({instrument.exchange})
-                                                                </span>
-                                                            </div>
-                                                        </CommandItem>
-                                                    ))}
-                                                </CommandGroup>
-                                            )}
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                            <p className="text-sm text-muted-foreground">
-                                Selected: {selectedInstrument ? `${selectedInstrument.ticker} - ${selectedInstrument.exchange}` : 'None'}
-                            </p>
-                        </div>
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                )}
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                                <p className="text-sm text-muted-foreground">
+                                    Selected: {selectedInstrument ? `${selectedInstrument.ticker} - ${selectedInstrument.exchange}` : 'None'}
+                                </p>
+                            </div>
+                        )}
 
                         {/* Quantity and Purchase Price Row */}
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -248,17 +419,23 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                                 name="quantity"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Quantity</FormLabel>
+                                        <FormLabel>{isBond ? 'Ilość obligacji' : 'Quantity'}</FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
-                                                step="0.000001"
-                                                placeholder="10"
+                                                step={isBond ? '1' : '0.000001'}
+                                                min="1"
+                                                placeholder={isBond ? '10' : '10'}
                                                 disabled={addInvestment.isPending}
                                                 {...field}
                                                 onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
                                             />
                                         </FormControl>
+                                        {isBond && (
+                                            <FormDescription>
+                                                Wartość: {(field.value || 0) * 100} PLN
+                                            </FormDescription>
+                                        )}
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -270,19 +447,21 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                                 name="purchasePrice"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Purchase Price</FormLabel>
+                                        <FormLabel>{isBond ? 'Cena jednostkowa' : 'Purchase Price'}</FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
                                                 step="0.01"
-                                                placeholder="150.00"
-                                                disabled={addInvestment.isPending}
+                                                placeholder={isBond ? '100.00' : '150.00'}
+                                                disabled={addInvestment.isPending || isBond}
                                                 {...field}
                                                 onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
                                             />
                                         </FormControl>
                                         <FormDescription>
-                                            {isFetchingPrice ? 'Fetching latest price...' : null}
+                                            {isBond
+                                                ? 'Cena nominalna: 100 PLN'
+                                                : isFetchingPrice ? 'Fetching latest price...' : null}
                                         </FormDescription>
                                         <FormMessage />
                                     </FormItem>
@@ -301,8 +480,8 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                                         <FormLabel>Currency</FormLabel>
                                         <Select
                                             onValueChange={field.onChange}
-                                            defaultValue={field.value}
-                                            disabled={addInvestment.isPending}
+                                            value={field.value}
+                                            disabled={addInvestment.isPending || isBond}
                                         >
                                             <FormControl>
                                                 <SelectTrigger>
@@ -328,7 +507,7 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                                 name="purchaseDate"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Purchase Date</FormLabel>
+                                        <FormLabel>{isBond ? 'Data zakupu' : 'Purchase Date'}</FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="date"
@@ -352,7 +531,10 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={addInvestment.isPending}>
+                            <Button
+                                type="submit"
+                                disabled={addInvestment.isPending || (isBond && !selectedBondSeries)}
+                            >
                                 {addInvestment.isPending ? 'Adding...' : 'Add Investment'}
                             </Button>
                         </div>

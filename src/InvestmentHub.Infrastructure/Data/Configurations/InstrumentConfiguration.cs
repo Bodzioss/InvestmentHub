@@ -13,11 +13,11 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
         builder.HasKey(i => i.Id);
 
         builder.Property(i => i.Name)
-            .HasMaxLength(200)
+            .HasMaxLength(500)
             .IsRequired();
 
         builder.Property(i => i.Isin)
-            .HasMaxLength(12)
+            .HasMaxLength(20)
             .IsRequired();
 
         // Configure Symbol as owned type
@@ -38,7 +38,7 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
                 .HasConversion<string>()
                 .HasMaxLength(50)
                 .IsRequired();
-            
+
             // Create index on Ticker for fast lookups
             symbol.HasIndex(s => s.Ticker);
         });

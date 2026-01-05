@@ -1,9 +1,10 @@
-using InvestmentHub.Domain.ReadModels;
 using InvestmentHub.Domain.Enums;
+using InvestmentHub.Domain.ValueObjects;
+using InvestmentHub.Domain.Queries;
 using InvestmentHub.Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using Marten;
+using MediatR;
 
 namespace InvestmentHub.API.Controllers;
 
@@ -12,23 +13,23 @@ namespace InvestmentHub.API.Controllers;
 [Authorize]
 public class PortfolioActionsController : ControllerBase
 {
-    private readonly IDocumentSession _session;
+    private readonly IMediator _mediator;
     private readonly MarketPriceService _marketPriceService;
     private readonly ILogger<PortfolioActionsController> _logger;
 
     public PortfolioActionsController(
-        IDocumentSession session,
+        IMediator mediator,
         MarketPriceService marketPriceService,
         ILogger<PortfolioActionsController> logger)
     {
-        _session = session;
+        _mediator = mediator;
         _marketPriceService = marketPriceService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Refreshes market prices for all investments in a portfolio.
-    /// Forces fresh fetch from market data provider.
+    /// Refreshes market prices for all ACTIVE positions in a portfolio.
+    /// Only refreshes symbols where net quantity > 0.
     /// </summary>
     [HttpPost("{portfolioId}/refresh-prices")]
     public async Task<IActionResult> RefreshPrices(string portfolioId)
@@ -37,83 +38,50 @@ public class PortfolioActionsController : ControllerBase
         {
             _logger.LogInformation("Refreshing prices for portfolio {PortfolioId}", portfolioId);
 
-            var portfolioGuid = Guid.Parse(portfolioId);
+            // Use GetPositionsQuery to get only active positions (net quantity > 0)
+            var portfolioIdVO = PortfolioId.FromString(portfolioId);
+            var positionsResult = await _mediator.Send(new GetPositionsQuery(portfolioIdVO));
 
-            // Get all investments for this portfolio from Marten READ MODEL
-            var investments = await _session
-                .Query<InvestmentReadModel>()
-                .Where(i => i.PortfolioId == portfolioGuid)
-                .ToListAsync();
+            if (!positionsResult.IsSuccess || positionsResult.Positions == null)
+            {
+                return BadRequest(new { error = positionsResult.ErrorMessage ?? "Failed to get positions" });
+            }
 
-            _logger.LogInformation("Marten returned {Count} total investments", investments.Count);
+            var positions = positionsResult.Positions.ToList();
+            _logger.LogInformation("Found {Count} active positions to refresh", positions.Count);
 
-            var activeInvestments = investments.Where(i => i.Status == InvestmentStatus.Active).ToList();
-
-            _logger.LogInformation("Found {Count} active investments to refresh", activeInvestments.Count);
-
-            // Force refresh price for each unique symbol (use Ticker directly from read model)
-            var symbols = activeInvestments
-                .Select(i => i.Ticker)
-                .Distinct()
-                .ToList();
+            // Debug: log actual symbols found
+            foreach (var p in positions)
+            {
+                _logger.LogInformation("  Position: {Ticker} ({Exchange}, {AssetType}), Qty: {Qty}",
+                    p.Symbol.Ticker, p.Symbol.Exchange, p.Symbol.AssetType, p.TotalQuantity);
+            }
 
             var refreshedCount = 0;
-            var updatedInvestments = new List<InvestmentReadModel>();
 
-            foreach (var symbol in symbols)
+            foreach (var position in positions)
             {
                 try
                 {
-                    var price = await _marketPriceService.ForceRefreshPriceAsync(symbol, CancellationToken.None);
+                    var price = await _marketPriceService.ForceRefreshPriceAsync(position.Symbol, CancellationToken.None);
                     if (price != null)
                     {
                         refreshedCount++;
                         _logger.LogDebug("Refreshed price for {Symbol}: {Price} {Currency}",
-                            symbol, price.Price, price.Currency);
-
-                        // Update CurrentValue for all investments with this symbol
-                        var investmentsToUpdate = activeInvestments.Where(i => i.Ticker == symbol);
-                        foreach (var investment in investmentsToUpdate)
-                        {
-                            // Calculate new current value
-                            var newCurrentValue = investment.Quantity * price.Price;
-
-                            // Update the read model
-                            investment.CurrentValue = newCurrentValue;
-                            investment.Currency = price.Currency;
-                            investment.LastUpdated = DateTime.UtcNow;
-
-                            updatedInvestments.Add(investment);
-
-                            _logger.LogDebug("Updated investment {Id} value to {Value} {Currency}",
-                                investment.Id, newCurrentValue, price.Currency);
-                        }
+                            position.Symbol.Ticker, price.Price, price.Currency);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to refresh price for {Symbol}", symbol);
+                    _logger.LogError(ex, "Failed to refresh price for {Symbol}", position.Symbol.Ticker);
                 }
-            }
-
-            // Save all updated read models back to Marten
-            if (updatedInvestments.Any())
-            {
-                foreach (var investment in updatedInvestments)
-                {
-                    _session.Store(investment);
-                }
-                await _session.SaveChangesAsync();
-
-                _logger.LogInformation("Saved {Count} updated investment read models", updatedInvestments.Count);
             }
 
             return Ok(new
             {
-                message = $"Successfully refreshed {refreshedCount} of {symbols.Count} prices",
+                message = $"Successfully refreshed {refreshedCount} of {positions.Count} prices",
                 refreshedCount,
-                totalSymbols = symbols.Count,
-                updatedInvestments = updatedInvestments.Count
+                totalSymbols = positions.Count
             });
         }
         catch (Exception ex)

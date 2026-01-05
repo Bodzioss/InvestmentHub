@@ -39,9 +39,11 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .HasMaxLength(20)
             .IsRequired();
 
-        // Symbol - owned entity
+        // Symbol - owned entity (Value Object)
         builder.OwnsOne(t => t.Symbol, symbol =>
         {
+            symbol.WithOwner().HasForeignKey("TransactionIdKey");
+
             symbol.Property(s => s.Ticker)
                 .HasColumnName("Symbol")
                 .HasMaxLength(20)
@@ -66,6 +68,8 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         // Price Per Unit - owned Money
         builder.OwnsOne(t => t.PricePerUnit, money =>
         {
+            money.WithOwner().HasForeignKey("TransactionIdKey");
+
             money.Property(m => m.Amount)
                 .HasColumnName("PricePerUnit")
                 .HasPrecision(18, 2);
@@ -79,6 +83,8 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         // Fee - owned Money (optional)
         builder.OwnsOne(t => t.Fee, money =>
         {
+            money.WithOwner().HasForeignKey("TransactionIdKey");
+
             money.Property(m => m.Amount)
                 .HasColumnName("Fee")
                 .HasPrecision(18, 2);
@@ -93,6 +99,8 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         // Gross Amount
         builder.OwnsOne(t => t.GrossAmount, money =>
         {
+            money.WithOwner().HasForeignKey("TransactionIdKey");
+
             money.Property(m => m.Amount)
                 .HasColumnName("GrossAmount")
                 .HasPrecision(18, 2);
@@ -111,6 +119,8 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         // Tax Withheld
         builder.OwnsOne(t => t.TaxWithheld, money =>
         {
+            money.WithOwner().HasForeignKey("TransactionIdKey");
+
             money.Property(m => m.Amount)
                 .HasColumnName("TaxWithheld")
                 .HasPrecision(18, 2);
@@ -124,6 +134,8 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         // Net Amount
         builder.OwnsOne(t => t.NetAmount, money =>
         {
+            money.WithOwner().HasForeignKey("TransactionIdKey");
+
             money.Property(m => m.Amount)
                 .HasColumnName("NetAmount")
                 .HasPrecision(18, 2);

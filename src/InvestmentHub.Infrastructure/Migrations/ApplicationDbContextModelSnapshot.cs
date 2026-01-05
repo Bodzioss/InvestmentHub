@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 
 #nullable disable
 
@@ -121,6 +122,94 @@ namespace InvestmentHub.Infrastructure.Migrations
                     b.ToTable("CachedMarketPrices", (string)null);
                 });
 
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.DocumentChunk", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ChunkIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Vector>("Embedding")
+                        .IsRequired()
+                        .HasColumnType("vector(768)");
+
+                    b.Property<int?>("PageNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportId");
+
+                    b.ToTable("DocumentChunks", (string)null);
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BlobUrl")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("ChunkCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Quarter")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReportType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstrumentId", "Year", "Quarter", "ReportType")
+                        .IsUnique();
+
+                    b.ToTable("FinancialReports", (string)null);
+                });
+
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Instrument", b =>
                 {
                     b.Property<Guid>("Id")
@@ -143,6 +232,42 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Instruments", (string)null);
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.InterestPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AccruedInterest")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("BondDetailsId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int>("PeriodNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BondDetailsId", "PeriodNumber")
+                        .IsUnique();
+
+                    b.HasIndex("BondDetailsId", "StartDate", "EndDate");
+
+                    b.ToTable("InterestPeriods", (string)null);
                 });
 
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Investment", b =>
@@ -218,6 +343,54 @@ namespace InvestmentHub.Infrastructure.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("Portfolios", (string)null);
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.TreasuryBondDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("EarlyRedemptionFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("FirstYearRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Margin")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<DateTime>("MaturityDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("NominalValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstrumentId")
+                        .IsUnique();
+
+                    b.HasIndex("MaturityDate");
+
+                    b.HasIndex("Type");
+
+                    b.ToTable("TreasuryBondDetails", (string)null);
                 });
 
             modelBuilder.Entity("InvestmentHub.Domain.Entities.User", b =>
@@ -607,6 +780,28 @@ namespace InvestmentHub.Infrastructure.Migrations
                     b.Navigation("TaxWithheld");
                 });
 
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.DocumentChunk", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.FinancialReport", "Report")
+                        .WithMany("Chunks")
+                        .HasForeignKey("ReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
+                        .WithMany()
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Instrument");
+                });
+
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Instrument", b =>
                 {
                     b.OwnsOne("InvestmentHub.Domain.ValueObjects.Symbol", "Symbol", b1 =>
@@ -644,6 +839,17 @@ namespace InvestmentHub.Infrastructure.Migrations
 
                     b.Navigation("Symbol")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.InterestPeriod", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.TreasuryBondDetails", "BondDetails")
+                        .WithMany("InterestPeriods")
+                        .HasForeignKey("BondDetailsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BondDetails");
                 });
 
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Investment", b =>
@@ -741,6 +947,17 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.TreasuryBondDetails", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
+                        .WithOne("BondDetails")
+                        .HasForeignKey("InvestmentHub.Domain.Entities.TreasuryBondDetails", "InstrumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Instrument");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
@@ -790,6 +1007,21 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
+                {
+                    b.Navigation("Chunks");
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.Instrument", b =>
+                {
+                    b.Navigation("BondDetails");
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.TreasuryBondDetails", b =>
+                {
+                    b.Navigation("InterestPeriods");
                 });
 #pragma warning restore 612, 618
         }

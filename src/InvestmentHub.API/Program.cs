@@ -36,16 +36,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-// Add database connection
+// Add database connection with pgvector support
 builder.AddNpgsqlDbContext<ApplicationDbContext>("postgres", configureDbContextOptions: options =>
 {
     options.UseNpgsql(npgsqlOptions =>
     {
+        npgsqlOptions.UseVector();
         npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 3,
             maxRetryDelay: TimeSpan.FromSeconds(10),
             errorCodesToAdd: null);
     });
+    // Suppress pending model changes warning - we use manual SQL migrations for pgvector tables
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 });
 
 // Configure Marten for Event Sourcing
@@ -209,15 +212,28 @@ builder.Services.AddInfrastructureHealthChecks(builder.Configuration, builder.En
 // Register YahooQuotes service
 builder.Services.AddSingleton(new YahooQuotesBuilder().Build());
 
-// Add Market Data Provider
+// Add Market Data Providers
+builder.Services.AddScoped<IMarketDataProvider, StooqMarketDataProvider>();
 builder.Services.AddScoped<IMarketDataProvider, YahooMarketDataProvider>();
 builder.Services.AddScoped<IMarketPriceRepository, InvestmentHub.Infrastructure.Repositories.MarketPriceRepository>();
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Services.MarketPriceService>();
+
+// Add AI Services
+builder.Services.AddScoped<InvestmentHub.Infrastructure.AI.IGeminiService, InvestmentHub.Infrastructure.AI.GeminiService>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.AI.DocumentProcessor>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.AI.VectorSearchService>();
+
+// Add Treasury Bonds Services
+builder.Services.AddScoped<InvestmentHub.Infrastructure.TreasuryBonds.BondValueCalculator>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.TreasuryBonds.BondDataProvider>();
 
 // Add Background Jobs
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.PriceUpdateJob>();
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.HistoricalImportJob>();
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Data.InstrumentImporter>();
+
+// Add CSV Import Services
+builder.Services.AddScoped<InvestmentHub.Infrastructure.Services.MyFundCsvParser>();
 
 // Add Hangfire services
 builder.Services.AddHangfireServices(builder.Configuration);

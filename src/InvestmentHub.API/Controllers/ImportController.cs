@@ -6,6 +6,7 @@ using InvestmentHub.Domain.Enums;
 using InvestmentHub.Contracts.Import;
 using InvestmentHub.Infrastructure.Services;
 using InvestmentHub.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace InvestmentHub.API.Controllers;
 
@@ -66,12 +67,33 @@ public class ImportController : ControllerBase
 
             var parseResult = _csvParser.Parse(csvContent);
 
-            var tickers = parseResult.Transactions.Select(t => t.Ticker).Distinct().ToList();
-            var existingInstruments = _context.Instruments
-                .Where(i => tickers.Contains(i.Symbol.Ticker))
+            var rawTickers = parseResult.Transactions.Select(t => t.Ticker).Distinct().ToList();
+
+            // Fetch all instruments for robust matching (or filter by base tickers if optimizing)
+            // For now fetching broader range is safest for fuzzy matching
+            var allInstruments = await _context.Instruments
                 .Select(i => new { i.Symbol.Ticker, i.Symbol.AssetType })
-                .AsEnumerable()
-                .ToDictionary(i => i.Ticker, i => i.AssetType);
+                .ToListAsync();
+
+            var existingInstruments = new Dictionary<string, AssetType>();
+
+            foreach (var rawTicker in rawTickers)
+            {
+                // 1. Direct match (e.g. "VHYL")
+                var match = allInstruments.FirstOrDefault(i => i.Ticker.Equals(rawTicker, StringComparison.OrdinalIgnoreCase));
+
+                // 2. Fuzzy match stripping suffix (e.g. "VHYL.AM" -> "VHYL")
+                if (match == null && rawTicker.Contains('.'))
+                {
+                    var baseTicker = rawTicker.Split('.')[0];
+                    match = allInstruments.FirstOrDefault(i => i.Ticker.Equals(baseTicker, StringComparison.OrdinalIgnoreCase));
+                }
+
+                if (match != null)
+                {
+                    existingInstruments[rawTicker] = match.AssetType;
+                }
+            }
 
             var response = new ImportPreviewResponse
             {
@@ -160,7 +182,26 @@ public class ImportController : ControllerBase
                     currency = Currency.PLN;
                 }
 
-                var instrument = _context.Instruments.FirstOrDefault(i => i.Symbol.Ticker == tx.Ticker);
+                // Match instrument (Direct or Fuzzy)
+                // Fetch candidate instruments (by exact match or base ticker)
+                var potentialTickers = new List<string> { tx.Ticker };
+                if (tx.Ticker.Contains('.'))
+                {
+                    potentialTickers.Add(tx.Ticker.Split('.')[0]);
+                }
+
+                var candidates = _context.Instruments
+                    .Where(i => potentialTickers.Contains(i.Symbol.Ticker))
+                    .ToList();
+
+                var instrument = candidates.FirstOrDefault(i => i.Symbol.Ticker.Equals(tx.Ticker, StringComparison.OrdinalIgnoreCase));
+
+                if (instrument == null && tx.Ticker.Contains('.'))
+                {
+                    var baseTicker = tx.Ticker.Split('.')[0];
+                    instrument = candidates.FirstOrDefault(i => i.Symbol.Ticker.Equals(baseTicker, StringComparison.OrdinalIgnoreCase));
+                }
+
                 if (instrument == null)
                 {
                     errors.Add($"Instrument {tx.Ticker} nie został znaleziony w systemie. Pomiń go lub dodaj ręcznie.");

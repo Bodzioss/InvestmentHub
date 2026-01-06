@@ -38,7 +38,7 @@ public class YahooMarketDataProvider : IMarketDataProvider
             traceLogs?.Add($"Yahoo: Polish exchange detected ({symbol.Exchange}), added .WA suffix -> {ticker}");
         }
 
-        var cacheKey = $"market:price:{ticker.ToUpper()}";
+        var cacheKey = $"market:price:v2:{ticker.ToUpper()}";
 
         // Try get from cache
         var cachedData = await _cache.GetStringAsync(cacheKey, cancellationToken);
@@ -66,17 +66,11 @@ public class YahooMarketDataProvider : IMarketDataProvider
             // Stooq doesn't explicitly return currency in this simplified API. 
             // We'll infer it: PLN for GPW-like tickers, or use a default.
             // Improved version could check if ticker is USDPLN etc.
-            var currency = "PLN";
-            if (symbol.Ticker.Length == 6 && (symbol.Ticker.EndsWith("PLN") || symbol.Ticker.StartsWith("USD") || symbol.Ticker.StartsWith("EUR")))
-            {
-                // Likely a currency pair, Close is the rate
-            }
-
             var price = new MarketPrice
             {
                 Symbol = symbol.Ticker,
                 Price = security.RegularMarketPrice,
-                Currency = currency,
+                Currency = security.Currency.ToString() ?? "PLN",
                 Timestamp = DateTime.UtcNow,
                 Source = "Yahoo"
             };

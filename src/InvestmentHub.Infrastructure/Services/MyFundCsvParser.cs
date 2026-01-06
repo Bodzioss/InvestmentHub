@@ -109,7 +109,7 @@ public class MyFundCsvParser
             try
             {
                 var columns = ParseCsvLine(line);
-                var transaction = ParseRow(columns, columnMap, i + 1);
+                var transaction = ParseRow(columns, columnMap);
 
                 if (transaction == null)
                 {
@@ -172,7 +172,7 @@ public class MyFundCsvParser
         return map;
     }
 
-    private ParsedTransaction? ParseRow(string[] columns, Dictionary<string, int> columnMap, int rowNumber)
+    private ParsedTransaction? ParseRow(string[] columns, Dictionary<string, int> columnMap)
     {
         string GetValue(string columnName) =>
             columnMap.TryGetValue(columnName, out var index) && index < columns.Length
@@ -254,7 +254,8 @@ public class MyFundCsvParser
             return string.Empty;
 
         // Pattern: "NAZWA (TICKER)" - extract TICKER from parentheses
-        var match = System.Text.RegularExpressions.Regex.Match(walor, @"\(([^)]+)\)");
+        // Use RightToLeft to find the last occurrence (e.g. "ETF (Dist) (VHYL.AS)" -> "VHYL.AS")
+        var match = System.Text.RegularExpressions.Regex.Match(walor, @"\(([^)]+)\)", System.Text.RegularExpressions.RegexOptions.RightToLeft);
         if (match.Success)
         {
             return match.Groups[1].Value.Trim();

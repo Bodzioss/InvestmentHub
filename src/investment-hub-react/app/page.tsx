@@ -86,6 +86,9 @@ export default function HomePage() {
             <Button variant="outline" onClick={() => router.push('/ai')}>
               AI Analyst
             </Button>
+            <Button variant="outline" onClick={() => router.push('/instruments')}>
+              Instruments
+            </Button>
             <Button variant="outline" onClick={() => router.push('/profile')}>
               Profile
             </Button>

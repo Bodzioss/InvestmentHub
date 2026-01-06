@@ -151,6 +151,31 @@ public class InstrumentDto
     public string Exchange { get; set; } = string.Empty;
     public string AssetType { get; set; } = string.Empty;
     public string Isin { get; set; } = string.Empty;
+    public EtfDetailsDto? EtfDetails { get; set; }
+    public BondDetailsDto? BondDetails { get; set; }
+}
+
+public class EtfDetailsDto
+{
+    public int? YearAdded { get; set; }
+    public string? Region { get; set; }
+    public string? Theme { get; set; }
+    public string? Manager { get; set; }
+    public string? DistributionType { get; set; }
+    public string? Domicile { get; set; }
+    public string? Replication { get; set; }
+    public decimal? AnnualFeePercent { get; set; }
+    public decimal? AssetsMillionsEur { get; set; }
+    public string? Currency { get; set; }
+}
+
+public class BondDetailsDto
+{
+    public string? BondType { get; set; }
+    public decimal? NominalValue { get; set; }
+    public decimal? InterestRate { get; set; }
+    public DateTime? MaturityDate { get; set; }
+    public string? Issuer { get; set; }
 }
 
 /// <summary>

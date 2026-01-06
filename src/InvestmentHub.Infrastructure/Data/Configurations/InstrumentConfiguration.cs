@@ -43,7 +43,7 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
             symbol.HasIndex(s => s.Ticker);
         });
 
-        // Create index on ISIN
-        builder.HasIndex(i => i.Isin).IsUnique();
+        // Create index on ISIN (non-unique as same ISIN can trade on multiple exchanges)
+        builder.HasIndex(i => i.Isin);
     }
 }

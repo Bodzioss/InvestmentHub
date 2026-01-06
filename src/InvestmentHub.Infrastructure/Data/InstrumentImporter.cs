@@ -273,7 +273,6 @@ public class InstrumentImporter
 
         var instruments = new List<Instrument>();
         var etfDetailsList = new List<Domain.Entities.EtfDetails>();
-        var existingIsins = new HashSet<string>(await _context.Instruments.Select(i => i.Isin).ToListAsync());
         var existingTickers = new HashSet<string>(await _context.Instruments.Select(i => i.Symbol.Ticker).ToListAsync());
 
         // Simple CSV parser for quoted fields
@@ -322,12 +321,15 @@ public class InstrumentImporter
             {
                 // Parse ISIN (col 3)
                 var isin = parts.Length > 3 ? parts[3].Trim() : "";
-                if (string.IsNullOrEmpty(isin) || existingIsins.Contains(isin)) continue;
+                if (string.IsNullOrEmpty(isin)) continue;
 
                 // Parse ticker from column 1 (simple ticker like "XMKA")
                 var ticker = parts[1].Trim();
                 if (string.IsNullOrEmpty(ticker)) continue;
-
+                if (ticker.Contains("IUSQ"))
+                {
+                    Console.WriteLine($"Skipping IUSQ: {ticker}");
+                }
                 // Parse Google ticker (col 2) for exchange, e.g., "FRA:XMKA"
                 var googleTicker = parts.Length > 2 ? parts[2].Trim() : "";
                 var tickerParts = googleTicker.Split(':');
@@ -367,7 +369,12 @@ public class InstrumentImporter
                 decimal? annualFee = null;
                 if (parts.Length > 15 && !string.IsNullOrEmpty(parts[15]))
                 {
-                    var feeStr = parts[15].Trim().Replace("%", "").Replace(",", ".");
+                    var feeStr = parts[15].Trim()
+                        .Replace("%", "")
+                        .Replace(" ", "")
+                        .Replace("\u00A0", "") // Non-breaking space
+                        .Replace(",", ".");
+
                     if (decimal.TryParse(feeStr, System.Globalization.NumberStyles.Any,
                         System.Globalization.CultureInfo.InvariantCulture, out var fee))
                     {
@@ -379,7 +386,11 @@ public class InstrumentImporter
                 decimal? assets = null;
                 if (parts.Length > 16 && !string.IsNullOrEmpty(parts[16]))
                 {
-                    var assetsStr = parts[16].Trim().Replace(",", ".");
+                    var assetsStr = parts[16].Trim()
+                        .Replace(" ", "")
+                        .Replace("\u00A0", "") // Non-breaking space
+                        .Replace(",", ".");
+
                     if (decimal.TryParse(assetsStr, System.Globalization.NumberStyles.Any,
                         System.Globalization.CultureInfo.InvariantCulture, out var a))
                     {
@@ -406,7 +417,6 @@ public class InstrumentImporter
 
                 instruments.Add(instrument);
                 etfDetailsList.Add(etfDetails);
-                existingIsins.Add(isin);
                 existingTickers.Add(ticker);
             }
             catch (Exception ex)

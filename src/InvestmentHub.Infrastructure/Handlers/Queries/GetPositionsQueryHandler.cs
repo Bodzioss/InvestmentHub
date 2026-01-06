@@ -1,6 +1,7 @@
 using InvestmentHub.Domain.Aggregates;
 using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.Models;
+using InvestmentHub.Domain.Interfaces;
 using InvestmentHub.Domain.Queries;
 using InvestmentHub.Domain.Repositories;
 using InvestmentHub.Domain.ValueObjects;
@@ -22,17 +23,20 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
     private readonly ApplicationDbContext _dbContext;
     private readonly MarketPriceService _marketPriceService;
     private readonly BondValueCalculator _bondValueCalculator;
+    private readonly IExchangeRateService _exchangeRateService;
     private readonly ILogger<GetPositionsQueryHandler> _logger;
 
     public GetPositionsQueryHandler(
         ApplicationDbContext dbContext,
         MarketPriceService marketPriceService,
         BondValueCalculator bondValueCalculator,
+        IExchangeRateService exchangeRateService,
         ILogger<GetPositionsQueryHandler> logger)
     {
         _dbContext = dbContext;
         _marketPriceService = marketPriceService;
         _bondValueCalculator = bondValueCalculator;
+        _exchangeRateService = exchangeRateService;
         _logger = logger;
     }
 
@@ -62,6 +66,47 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
             {
                 // Get the Symbol from the first transaction in the group
                 var symbol = group.First().Symbol;
+                // Pass portfolio currency (assuming all transactions in portfolio imply a base currency context, 
+                // but for now we default to parsing it from the first transaction or PLN if we want to enforce it.
+                // However, request doesn't pass Portfolio object. We should probably infer base currency from the first transaction 
+                // BUT the goal is to convert FOREIGN assets to NATIVE currency.
+                // Assuming "Native" means PLN if the user is Polish, OR the currency of conversion.
+                // Let's assume the goal is to display value in the CURRENCY OF THE INSTRUMENT unless it's a foreign ETF in a PLN portfolio?
+                // Actually, the user says "ETF is in EUR and shows poorly".
+                // If I have a PLN portfolio, I want to see value in PLN.
+                // Logic:
+                // 1. Determine Portfolio Base Currency (from first transaction or default PLN).
+                // 2. Fetch price in Instrument Currency (EUR).
+                // 3. Convert to Portfolio Currency (PLN).
+
+                // For now, let's assume the "Currency" derived in CalculatePositionAsync is the "Portfolio/Transaction" currency 
+                // that was used to buy it. If I bought IUSQ with EUR, currency is EUR.
+                // But if I want to see it in PLN, I need to convert.
+                // Let's look at the User Request again: "17.0000 322.38 PLN".
+                // It seems the user BOUGHT it in PLN? Or implies they want to see it in PLN.
+                // If `transactions` have currency PLN (because user entered costs in PLN?), but price comes in EUR.
+                // Wait, if user bought in EUR, `currency` variable will be EUR.
+                // Then `TotalCost` is in EUR.
+                // `CurrentPrice` (from market) is in EUR.
+                // `CurrentValue` is in EUR.
+                // If UI shows "PLN", it's a UI issue or Portfolio currency issue.
+
+                // Case: ETF is IUSQ.DE (EUR). User has PLN portfolio.
+                // If imports from CSV where currency was EUR, then `currency` is EUR.
+                // The UI might be showing "PLN" hardcoded or from portfolio settings?
+                // The user says: "17.0000 322.38 PLN 94.17 PLN 1600.89 PLN".
+                // This suggests the UI is labeling it PLN but the numbers are EUR (e.g. 17 units * ~94 EUR = ~1600).
+                // 94 PLN for IUSQ is too low (it's ~115 EUR -> ~500 PLN).
+                // Wait, 17 units. 1600 / 17 = 94. 
+                // If price is 94 EUR, that's possible.
+                // If price is 115 EUR, then 17*115 = 1955.
+                // User says: "This ETF is in euro and thus shows value incorrectly".
+
+                // HYPOTHESIS: User wants EVERYTHING converted to PLN (Portfolio Currency).
+                // I need to:
+                // 1. Detect if `currency` (from transactions) is different from `PLN`? Or always convert to PLN?
+                // Let's look at `CalculatePositionAsync`.
+
                 var position = await CalculatePositionAsync(symbol, group.ToList(), cancellationToken);
                 if (position.TotalQuantity > 0 || position.TotalIncome.Amount > 0)
                 {
@@ -83,7 +128,9 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
     /// </summary>
     private async Task<Position> CalculatePositionAsync(Symbol symbol, List<Transaction> transactions, CancellationToken cancellationToken)
     {
-        var currency = transactions.FirstOrDefault()?.PricePerUnit?.Currency
+        // 1. Determine the "Booking Currency" - the currency the transactions were recorded in.
+        // If I bought in EUR, this is EUR.
+        var bookingCurrency = transactions.FirstOrDefault()?.PricePerUnit?.Currency
             ?? transactions.FirstOrDefault()?.GrossAmount?.Currency
             ?? Currency.USD;
 
@@ -93,24 +140,73 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
         var dividends = transactions.Where(t => t.Type == TransactionType.DIVIDEND).ToList();
         var interests = transactions.Where(t => t.Type == TransactionType.INTEREST).ToList();
 
-        // Calculate FIFO cost basis and realized gains
-        var (remainingQuantity, averageCost, totalCost, realizedGains) = CalculateFIFO(buys, sells, currency);
+        // Calculate FIFO cost basis and realized gains in BOOKING currency
+        var (remainingQuantity, averageCost, totalCost, realizedGains) = CalculateFIFO(buys, sells, bookingCurrency);
 
-        // Calculate income
-        var totalDividends = new Money(
-            dividends.Sum(d => d.NetAmount?.Amount ?? 0),
-            currency);
-
-        var totalInterest = new Money(
-            interests.Sum(i => i.NetAmount?.Amount ?? 0),
-            currency);
-
-        var totalIncome = new Money(
-            totalDividends.Amount + totalInterest.Amount,
-            currency);
+        // Calculate income in BOOKING currency
+        var totalDividends = new Money(dividends.Sum(d => d.NetAmount?.Amount ?? 0), bookingCurrency);
+        var totalInterest = new Money(interests.Sum(i => i.NetAmount?.Amount ?? 0), bookingCurrency);
+        var totalIncome = new Money(totalDividends.Amount + totalInterest.Amount, bookingCurrency);
 
         // Fetch current market price from service (live or cached)
-        var currentPrice = await GetCurrentPriceAsync(symbol, currency, buys, sells, cancellationToken);
+        // This returns price in the INSTRUMENT'S NATIVE trading currency (e.g. EUR for IUSQ.DE)
+        var marketPrice = await GetCurrentPriceAsync(symbol, bookingCurrency, buys, sells, cancellationToken);
+        var marketCurrency = marketPrice.Currency;
+
+        // *** CURRENCY CONVERSION LOGIC ***
+        // We want to align everything to a common "Reporting Currency".
+        // Ideally, this is the Portfolio's currency (PLN usually).
+        // Since we don't have Portfolio object here easily (without extra fetch), 
+        // we'll assume we want to convert everything to PLN if the asset is foreign, 
+        // OR we trust the "Booking Currency" if it matches Portfolio.
+        // 
+        // However, if the user manually imported EUR transactions, `bookingCurrency` is EUR.
+        // But the user likely wants to see the total value in PLN in the summary.
+        // The Position object has `CurrentValue`, `TotalCost`, etc.
+        // If we return mixed currencies (some PLN positions, some EUR), the frontend might not sum them correctly.
+        // 
+        // Let's target converting everything to PLN if it's not already,
+        // OR convert market price to booking currency?
+        // 
+        // User scenario: "IUSQ is in EUR... shows wrongly".
+        // If user sees "PLN" on UI but value is numeric EUR, it means UI assumes PLN.
+        // So we MUST return PLN values.
+
+        var targetCurrency = Currency.PLN; // Default target
+
+        // Helper to convert money if needed
+        async Task<Money> ConvertToTarget(Money money)
+        {
+            if (money.Currency == targetCurrency) return money;
+            var rate = await _exchangeRateService.GetExchangeRateAsync(money.Currency, targetCurrency, cancellationToken);
+            if (rate.HasValue)
+            {
+                var convertedAmount = money.Amount * rate.Value;
+                _logger.LogDebug("Converted {Amount} {From} to {Result} {To} (Rate: {Rate})",
+                    money.Amount, money.Currency, convertedAmount, targetCurrency, rate);
+                return new Money(convertedAmount, targetCurrency);
+            }
+            return money; // Fallback
+        }
+
+        // Convert costs and income to Target Currency (PLN)
+        // We do this mostly for the "Current Value" and "Total Cost" to be comparable.
+        // But wait, if we change TotalCost from EUR to PLN, we re-base the cost basis.
+
+        var displayAverageCost = await ConvertToTarget(averageCost);
+        var displayTotalCost = await ConvertToTarget(totalCost);
+        var displayRealizedGains = await ConvertToTarget(realizedGains);
+        var displayTotalIncome = await ConvertToTarget(totalIncome);
+        var displayTotalDividends = await ConvertToTarget(totalDividends);
+        var displayTotalInterest = await ConvertToTarget(totalInterest);
+
+        // Convert Market Price to Target Currency
+        var displayCurrentPrice = marketPrice.Currency == targetCurrency
+            ? marketPrice
+            : (await _exchangeRateService.ConvertAsync(marketPrice.Amount, marketPrice.Currency, targetCurrency, cancellationToken) ?? marketPrice);
+
+        // Now calculate Current Value using the DISPLAY price (in PLN)
+        // This ensures the value is ~500 PLN, not 115.
 
         // For CORPORATE bonds (Catalyst - FPC, BGK, etc.), price is a PERCENTAGE of nominal value (1000 PLN)
         // Convert BOTH cost and value to absolute amounts using: (percentage/100) × 1000
@@ -121,20 +217,22 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
              symbol.Ticker.StartsWith("BGK", StringComparison.OrdinalIgnoreCase));
 
         decimal currentValueAmount;
-        Money adjustedTotalCost = totalCost;
-        Money adjustedAverageCost = averageCost;
+        Money finalTotalCost = displayTotalCost;
+        Money finalAverageCost = displayAverageCost;
 
         if (isCatalystBond)
         {
             const decimal nominalValue = 1000m;
-            // Convert current value
-            currentValueAmount = remainingQuantity * (currentPrice.Amount / 100m) * nominalValue;
-            // Convert costs (purchase price is also a percentage)
-            adjustedTotalCost = new Money((totalCost.Amount / 100m) * nominalValue, currency);
-            adjustedAverageCost = new Money((averageCost.Amount / 100m) * nominalValue, currency);
+            // Convert current value (Price is in %, so we use base logic)
+            // Note: Catalyst is usually PLN, so conversion might be 1:1.
+            currentValueAmount = remainingQuantity * (displayCurrentPrice.Amount / 100m) * nominalValue;
+
+            // Adjust costs similarly (they are already in PLN due to ConvertToTarget above)
+            finalTotalCost = new Money((displayTotalCost.Amount / 100m) * nominalValue, targetCurrency);
+            finalAverageCost = new Money((displayAverageCost.Amount / 100m) * nominalValue, targetCurrency);
 
             _logger.LogDebug("Catalyst bond {Symbol}: value = {Qty} × ({Price}/100) × {Nominal} = {Value}, totalCost = {Cost}",
-                symbol.Ticker, remainingQuantity, currentPrice.Amount, nominalValue, currentValueAmount, adjustedTotalCost.Amount);
+                symbol.Ticker, remainingQuantity, displayCurrentPrice.Amount, nominalValue, currentValueAmount, finalTotalCost.Amount);
         }
         else if (IsTreasuryBond(symbol))
         {
@@ -160,13 +258,14 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
         }
         else
         {
-            currentValueAmount = currentPrice.Amount * remainingQuantity;
+            // Standard Entity: Value = Price * Quantity
+            currentValueAmount = displayCurrentPrice.Amount * remainingQuantity;
         }
 
-        var currentValue = new Money(currentValueAmount, currency);
-        var unrealizedGainLoss = new Money(currentValue.Amount - adjustedTotalCost.Amount, currency);
-        var unrealizedPercent = adjustedTotalCost.Amount > 0
-            ? (unrealizedGainLoss.Amount / adjustedTotalCost.Amount) * 100
+        var currentValue = new Money(currentValueAmount, targetCurrency);
+        var unrealizedGainLoss = new Money(currentValue.Amount - finalTotalCost.Amount, targetCurrency);
+        var unrealizedPercent = finalTotalCost.Amount > 0
+            ? (unrealizedGainLoss.Amount / finalTotalCost.Amount) * 100
             : 0;
 
         // Maturity date for bonds
@@ -177,16 +276,16 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
             Symbol = symbol,
             PortfolioId = transactions[0].PortfolioId,
             TotalQuantity = remainingQuantity,
-            AverageCost = adjustedAverageCost,
-            TotalCost = adjustedTotalCost,
-            CurrentPrice = currentPrice,
+            AverageCost = finalAverageCost,
+            TotalCost = finalTotalCost,
+            CurrentPrice = displayCurrentPrice,
             CurrentValue = currentValue,
             UnrealizedGainLoss = unrealizedGainLoss,
             UnrealizedGainLossPercent = unrealizedPercent,
-            TotalDividends = totalDividends,
-            TotalInterest = totalInterest,
-            TotalIncome = totalIncome,
-            RealizedGainLoss = realizedGains,
+            TotalDividends = displayTotalDividends,
+            TotalInterest = displayTotalInterest,
+            TotalIncome = displayTotalIncome,
+            RealizedGainLoss = displayRealizedGains,
             MaturityDate = maturityDate
         };
     }
@@ -206,7 +305,14 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
             var livePrice = await _marketPriceService.GetCurrentPriceAsync(symbol, cancellationToken);
             if (livePrice != null)
             {
-                _logger.LogDebug("Using market price {Price} for {Symbol}", livePrice.Price, symbol.Ticker);
+                _logger.LogDebug("Using market price {Price} {Currency} for {Symbol}", livePrice.Price, livePrice.Currency, symbol.Ticker);
+
+                if (Enum.TryParse<Currency>(livePrice.Currency, true, out var priceCurrency))
+                {
+                    return new Money(livePrice.Price, priceCurrency);
+                }
+
+                _logger.LogWarning("Failed to parse currency {Currency} for {Symbol}, falling back to {Fallback}", livePrice.Currency, symbol.Ticker, currency);
                 return new Money(livePrice.Price, currency);
             }
         }

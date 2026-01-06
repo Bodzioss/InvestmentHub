@@ -217,6 +217,7 @@ builder.Services.AddScoped<IMarketDataProvider, StooqMarketDataProvider>();
 builder.Services.AddScoped<IMarketDataProvider, YahooMarketDataProvider>();
 builder.Services.AddScoped<IMarketPriceRepository, InvestmentHub.Infrastructure.Repositories.MarketPriceRepository>();
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Services.MarketPriceService>();
+builder.Services.AddScoped<IExchangeRateService, InvestmentHub.Infrastructure.Services.ExchangeRateService>();
 
 // Add AI Services
 builder.Services.AddScoped<InvestmentHub.Infrastructure.AI.IGeminiService, InvestmentHub.Infrastructure.AI.GeminiService>();

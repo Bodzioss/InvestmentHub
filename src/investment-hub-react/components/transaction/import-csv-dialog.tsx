@@ -336,15 +336,10 @@ export function ImportCsvDialog({ portfolioId, children }: ImportCsvDialogProps)
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertTitle>Ostrzeżenia</AlertTitle>
                                 <AlertDescription>
-                                    <ul className="list-disc list-inside mt-2 max-h-20 overflow-y-auto">
-                                        {previewData.warnings.slice(0, 5).map((warn, i) => (
+                                    <ul className="list-disc list-inside mt-2 max-h-60 overflow-y-auto">
+                                        {previewData.warnings.map((warn, i) => (
                                             <li key={i}>{warn}</li>
                                         ))}
-                                        {previewData.warnings.length > 5 && (
-                                            <li className="text-muted-foreground">
-                                                ...i {previewData.warnings.length - 5} więcej
-                                            </li>
-                                        )}
                                     </ul>
                                 </AlertDescription>
                             </Alert>

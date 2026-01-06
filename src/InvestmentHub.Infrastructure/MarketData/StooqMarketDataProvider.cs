@@ -83,7 +83,23 @@ public class StooqMarketDataProvider : IMarketDataProvider
                 return null;
             }
 
-            var currency = "PLN";
+            // Infer currency from ticker suffix
+            var currency = "PLN"; // Default
+            if (ticker.Contains('.'))
+            {
+                var suffix = ticker.Split('.').Last().ToUpper();
+                currency = suffix switch
+                {
+                    "US" => "USD",
+                    "UK" => "GBP",
+                    "DE" => "EUR",
+                    "FR" => "EUR",
+                    "NL" => "EUR",
+                    "JP" => "JPY",
+                    "CH" => "CHF",
+                    _ => "PLN"
+                };
+            }
 
             // NOTE: For Catalyst bonds, price from Stooq is a PERCENTAGE of nominal value (1000 PLN)
             // We store it as-is (e.g., 67.39) - just like purchase price

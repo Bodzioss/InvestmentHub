@@ -3,18 +3,21 @@ using System;
 using InvestmentHub.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
 
 #nullable disable
 
-namespace InvestmentHub.Infrastructure.Migrations
+namespace InvestmentHub.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260106100941_ExtendTickerColumnLength")]
+    partial class ExtendTickerColumnLength
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -155,65 +158,6 @@ namespace InvestmentHub.Infrastructure.Migrations
                     b.ToTable("DocumentChunks", (string)null);
                 });
 
-            modelBuilder.Entity("InvestmentHub.Domain.Entities.EtfDetails", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("AnnualFeePercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)");
-
-                    b.Property<decimal?>("AssetsMillionsEur")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("Currency")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("DistributionType")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Domicile")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ExtendedTicker")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<Guid>("InstrumentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Manager")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Region")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Replication")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Theme")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int?>("YearAdded")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InstrumentId")
-                        .IsUnique();
-
-                    b.ToTable("EtfDetails", (string)null);
-                });
-
             modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
                 {
                     b.Property<Guid>("Id")
@@ -346,13 +290,12 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 8)
                         .HasColumnType("decimal(18,8)");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
@@ -790,8 +733,8 @@ namespace InvestmentHub.Infrastructure.Migrations
 
                             b1.Property<string>("Ticker")
                                 .IsRequired()
-                                .HasMaxLength(50)
-                                .HasColumnType("character varying(50)")
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
                                 .HasColumnName("Symbol");
 
                             b1.HasKey("TransactionIdKey");
@@ -851,17 +794,6 @@ namespace InvestmentHub.Infrastructure.Migrations
                     b.Navigation("Report");
                 });
 
-            modelBuilder.Entity("InvestmentHub.Domain.Entities.EtfDetails", b =>
-                {
-                    b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
-                        .WithOne("EtfDetails")
-                        .HasForeignKey("InvestmentHub.Domain.Entities.EtfDetails", "InstrumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Instrument");
-                });
-
             modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
                 {
                     b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
@@ -894,8 +826,8 @@ namespace InvestmentHub.Infrastructure.Migrations
 
                             b1.Property<string>("Ticker")
                                 .IsRequired()
-                                .HasMaxLength(50)
-                                .HasColumnType("character varying(50)")
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
                                 .HasColumnName("SymbolTicker");
 
                             b1.HasKey("InstrumentId");
@@ -937,14 +869,13 @@ namespace InvestmentHub.Infrastructure.Migrations
                                 .HasColumnType("uuid");
 
                             b1.Property<decimal>("Amount")
-                                .HasPrecision(18, 8)
                                 .HasColumnType("decimal(18,2)")
                                 .HasColumnName("CurrentValueAmount");
 
                             b1.Property<string>("Currency")
                                 .IsRequired()
-                                .HasMaxLength(10)
-                                .HasColumnType("character varying(10)")
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
                                 .HasColumnName("CurrentValueCurrency");
 
                             b1.HasKey("InvestmentId");
@@ -961,14 +892,13 @@ namespace InvestmentHub.Infrastructure.Migrations
                                 .HasColumnType("uuid");
 
                             b1.Property<decimal>("Amount")
-                                .HasPrecision(18, 8)
                                 .HasColumnType("decimal(18,2)")
                                 .HasColumnName("PurchasePriceAmount");
 
                             b1.Property<string>("Currency")
                                 .IsRequired()
-                                .HasMaxLength(10)
-                                .HasColumnType("character varying(10)")
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
                                 .HasColumnName("PurchasePriceCurrency");
 
                             b1.HasKey("InvestmentId");
@@ -998,8 +928,8 @@ namespace InvestmentHub.Infrastructure.Migrations
 
                             b1.Property<string>("Ticker")
                                 .IsRequired()
-                                .HasMaxLength(50)
-                                .HasColumnType("character varying(50)")
+                                .HasMaxLength(10)
+                                .HasColumnType("character varying(10)")
                                 .HasColumnName("SymbolTicker");
 
                             b1.HasKey("InvestmentId");
@@ -1090,8 +1020,6 @@ namespace InvestmentHub.Infrastructure.Migrations
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Instrument", b =>
                 {
                     b.Navigation("BondDetails");
-
-                    b.Navigation("EtfDetails");
                 });
 
             modelBuilder.Entity("InvestmentHub.Domain.Entities.TreasuryBondDetails", b =>

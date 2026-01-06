@@ -312,6 +312,11 @@ else
 // Ensure database is created and seeded
 using (var scope = app.Services.CreateScope())
 {
+    // Apply pending migrations first
+    var dbContext = scope.ServiceProvider.GetRequiredService<InvestmentHub.Infrastructure.Data.ApplicationDbContext>();
+    await dbContext.Database.MigrateAsync();
+    logger.LogInformation("Database migrations applied successfully");
+
     // Use ServiceProvider to allow Seeder to create background scopes
     var yahooQuotes = scope.ServiceProvider.GetRequiredService<YahooQuotesApi.YahooQuotes>();
     await DatabaseSeeder.SeedAsync(scope.ServiceProvider, yahooQuotes);

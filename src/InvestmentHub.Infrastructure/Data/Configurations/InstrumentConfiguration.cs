@@ -25,7 +25,7 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
         {
             symbol.Property(s => s.Ticker)
                 .HasColumnName("SymbolTicker")
-                .HasMaxLength(10)
+                .HasMaxLength(50)
                 .IsRequired();
 
             symbol.Property(s => s.Exchange)

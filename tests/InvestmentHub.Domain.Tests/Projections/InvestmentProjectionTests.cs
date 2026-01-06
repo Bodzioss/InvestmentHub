@@ -206,7 +206,7 @@ public class InvestmentProjectionTests
             DateTime.UtcNow);
 
         // Act
-        var result = _projection.Apply(readModel, @event);
+        var result = InvestmentProjection.Apply(readModel, @event);
 
         // Assert
         result.Should().BeNull(); // Signals Marten to delete the document

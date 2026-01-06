@@ -227,7 +227,7 @@ public class GetPositionsQueryHandler : IRequestHandler<GetPositionsQuery, GetPo
     /// <summary>
     /// FIFO (First-In, First-Out) cost basis calculation.
     /// </summary>
-    private (decimal quantity, Money avgCost, Money totalCost, Money realizedGains) CalculateFIFO(
+    private static (decimal quantity, Money avgCost, Money totalCost, Money realizedGains) CalculateFIFO(
         List<Transaction> buys,
         List<Transaction> sells,
         Currency currency)

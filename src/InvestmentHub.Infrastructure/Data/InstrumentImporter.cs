@@ -272,6 +272,7 @@ public class InstrumentImporter
         if (lines.Length < 2) return;
 
         var instruments = new List<Instrument>();
+        var etfDetailsList = new List<Domain.Entities.EtfDetails>();
         var existingIsins = new HashSet<string>(await _context.Instruments.Select(i => i.Isin).ToListAsync());
         var existingTickers = new HashSet<string>(await _context.Instruments.Select(i => i.Symbol.Ticker).ToListAsync());
 
@@ -290,59 +291,142 @@ public class InstrumentImporter
         }
         Console.WriteLine($"ETF CSV: Found header at row {headerRowIndex}, starting data import...");
 
+        // CSV Columns (correct mapping):
+        // 0: Rok dodania
+        // 1: Ticker (e.g., "XMKA")
+        // 2: Ticker (Google) -> e.g. "FRA:XMKA"
+        // 3: Kod ISIN
+        // 4: Kraj lub region
+        // 5: Temat inwestycji
+        // 6: Pełna nazwa
+        // 7: Zarządzany przez
+        // 8: Typ (Accumulating/Distributing)
+        // 9: Rok powstania
+        // 10: Rezydentura (domicile)
+        // 11: Replikacja
+        // 12-14: mBank/XTB/BOŚ availability
+        // 15: Opłata roczna
+        // 16: Aktywa (mln EUR)
+        // 17: Liczba instrumentów
+        // 18: Waluta funduszu
+
         for (int i = headerRowIndex + 1; i < lines.Length; i++)
         {
             var line = lines[i];
             if (string.IsNullOrWhiteSpace(line)) continue;
 
             var parts = csvRegex.Split(line).Select(p => p.Trim('"')).ToArray();
-            if (parts.Length < 14) continue;
-
-            // Columns: 
-            // 0: Ticker
-            // 1: Ticker (Google) -> e.g. "FRA:VWCE"
-            // 2: Kod ISIN
-            // 3: Waluta
-            // 4: Pełna nazwa
-            // ...
-            // 13: Giełda
-
-            var isin = parts[2];
-            if (existingIsins.Contains(isin)) continue;
-
-            var name = parts[4];
-            var googleTicker = parts[1];
-            var tickerParts = googleTicker.Split(':');
-
-            var ticker = tickerParts.Length > 1 ? tickerParts[1] : parts[0];
-            var googleExchange = tickerParts.Length > 1 ? tickerParts[0] : "";
-
-            var exchange = MapGoogleExchangeToSystem(googleExchange, parts[13]);
-
-            if (existingTickers.Contains(ticker) && await _context.Instruments.AnyAsync(ins => ins.Symbol.Ticker == ticker && ins.Symbol.Exchange == exchange))
-                continue;
+            if (parts.Length < 7) continue; // Need at least through Name column
 
             try
             {
+                // Parse ISIN (col 3)
+                var isin = parts.Length > 3 ? parts[3].Trim() : "";
+                if (string.IsNullOrEmpty(isin) || existingIsins.Contains(isin)) continue;
+
+                // Parse ticker from column 1 (simple ticker like "XMKA")
+                var ticker = parts[1].Trim();
+                if (string.IsNullOrEmpty(ticker)) continue;
+
+                // Parse Google ticker (col 2) for exchange, e.g., "FRA:XMKA"
+                var googleTicker = parts.Length > 2 ? parts[2].Trim() : "";
+                var tickerParts = googleTicker.Split(':');
+                var googleExchange = tickerParts.Length > 1 ? tickerParts[0] : "";
+
+                // If ticker from col 1 is empty, try from Google ticker
+                if (string.IsNullOrEmpty(ticker) && tickerParts.Length > 1)
+                {
+                    ticker = tickerParts[1];
+                }
+
+                var exchange = MapGoogleExchangeToSystem(googleExchange, "");
+
+                // Check for duplicates
+                if (existingTickers.Contains(ticker) &&
+                    await _context.Instruments.AnyAsync(ins => ins.Symbol.Ticker == ticker && ins.Symbol.Exchange == exchange))
+                    continue;
+
+                // Parse name (col 6)
+                var name = parts.Length > 6 ? parts[6].Trim() : $"ETF {ticker}";
+                if (string.IsNullOrEmpty(name)) name = $"ETF {ticker}";
+
+                // Create instrument
                 var symbol = new Domain.ValueObjects.Symbol(ticker, exchange, AssetType.ETF);
                 var instrument = new Instrument(symbol, name, isin);
 
+                // Parse ETF details from remaining columns
+                int? yearAdded = int.TryParse(parts[0], out var ya) ? ya : null;
+                string? region = parts.Length > 4 ? NullIfEmpty(parts[4]) : null;
+                string? theme = parts.Length > 5 ? NullIfEmpty(parts[5]) : null;
+                string? manager = parts.Length > 7 ? NullIfEmpty(parts[7]) : null;
+                string? distributionType = parts.Length > 8 ? NullIfEmpty(parts[8]) : null;
+                string? domicile = parts.Length > 10 ? NullIfEmpty(parts[10]) : null;
+                string? replication = parts.Length > 11 ? NullIfEmpty(parts[11]) : null;
+
+                // Parse annual fee (col 15), handle "0,65%" format
+                decimal? annualFee = null;
+                if (parts.Length > 15 && !string.IsNullOrEmpty(parts[15]))
+                {
+                    var feeStr = parts[15].Trim().Replace("%", "").Replace(",", ".");
+                    if (decimal.TryParse(feeStr, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out var fee))
+                    {
+                        annualFee = fee;
+                    }
+                }
+
+                // Parse assets (col 16)
+                decimal? assets = null;
+                if (parts.Length > 16 && !string.IsNullOrEmpty(parts[16]))
+                {
+                    var assetsStr = parts[16].Trim().Replace(",", ".");
+                    if (decimal.TryParse(assetsStr, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out var a))
+                    {
+                        assets = a;
+                    }
+                }
+
+                string? currency = parts.Length > 18 ? NullIfEmpty(parts[18]) : null;
+
+                var etfDetails = new Domain.Entities.EtfDetails(
+                    instrument.Id,
+                    yearAdded,
+                    region,
+                    theme,
+                    manager,
+                    distributionType,
+                    domicile,
+                    replication,
+                    annualFee,
+                    assets,
+                    currency,
+                    googleTicker
+                );
+
                 instruments.Add(instrument);
+                etfDetailsList.Add(etfDetails);
                 existingIsins.Add(isin);
                 existingTickers.Add(ticker);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error importing ETF {name}: {ex.Message}");
+                Console.WriteLine($"Error importing ETF from row {i}: {ex.Message}");
             }
         }
 
         if (instruments.Any())
         {
             await _context.Instruments.AddRangeAsync(instruments);
+            await _context.Set<Domain.Entities.EtfDetails>().AddRangeAsync(etfDetailsList);
             await _context.SaveChangesAsync();
-            Console.WriteLine($"Imported {instruments.Count} ETFs.");
+            Console.WriteLine($"Imported {instruments.Count} ETFs with details.");
         }
+    }
+
+    private static string? NullIfEmpty(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static string MapGoogleExchangeToSystem(string googlePrefix, string exchangeName)

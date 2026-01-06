@@ -60,4 +60,10 @@ public class Instrument
     /// Null for non-bond instruments.
     /// </summary>
     public TreasuryBondDetails? BondDetails { get; init; }
+
+    /// <summary>
+    /// Gets the ETF details if this instrument is an ETF.
+    /// Null for non-ETF instruments.
+    /// </summary>
+    public EtfDetails? EtfDetails { get; init; }
 }

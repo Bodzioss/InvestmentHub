@@ -46,7 +46,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
 
             symbol.Property(s => s.Ticker)
                 .HasColumnName("Symbol")
-                .HasMaxLength(20)
+                .HasMaxLength(50)
                 .IsRequired();
 
             symbol.Property(s => s.Exchange)

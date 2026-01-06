@@ -20,13 +20,13 @@ public class MartenDeleteTest : IClassFixture<MartenFixture>
     public async Task Can_Load_And_Delete_Portfolio()
     {
         // Arrange
-        await using var session = _fixture.Store.LightweightSession();
+        await using var session = _fixture.Store?.LightweightSession();
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
         
         // Create
         var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Delete Test Portfolio", "Description");
-        session.Events.StartStream<PortfolioAggregate>(portfolioId.Value, aggregate.GetUncommittedEvents().ToArray());
+        session!.Events.StartStream<PortfolioAggregate>(portfolioId.Value, aggregate.GetUncommittedEvents().ToArray());
         await session.SaveChangesAsync();
 
         // Act - Load

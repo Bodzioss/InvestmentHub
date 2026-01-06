@@ -99,7 +99,7 @@ public class InvestmentProjection : SingleStreamProjection<InvestmentReadModel>
     /// Deletes the read model when investment is deleted.
     /// Returns null to signal Marten to delete the document.
     /// </summary>
-    public InvestmentReadModel? Apply(InvestmentReadModel model, InvestmentDeletedEvent @event)
+    public static InvestmentReadModel? Apply(InvestmentReadModel model, InvestmentDeletedEvent @event)
     {
         return null;
     }

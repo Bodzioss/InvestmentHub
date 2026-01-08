@@ -136,9 +136,98 @@ public class StooqMarketDataProvider : IMarketDataProvider
 
     public async Task<IEnumerable<MarketPrice>> GetHistoricalPricesAsync(Domain.ValueObjects.Symbol symbol, DateTime from, DateTime to, CancellationToken cancellationToken = default, List<string>? traceLogs = null)
     {
-        // Stooq historical is harder via this API (needs different endpoint like /q/d/l/)
-        // For now, we return empty as Yahoo is primary for history
-        return await Task.FromResult(Enumerable.Empty<MarketPrice>());
+        var ticker = symbol.Ticker;
+        var isPolishExchange = symbol.Exchange == "GPW" || symbol.Exchange == "WSE" || symbol.Exchange == "WAR" || symbol.Exchange == "NewConnect" || symbol.Exchange == "Catalyst";
+
+        // Attempt retrieval
+        var history = await FetchHistoryAsync(ticker, symbol, from, to, cancellationToken, traceLogs);
+
+        // Retry with .PL if empty and Polish
+        if (!history.Any() && isPolishExchange && !ticker.EndsWith(".PL", StringComparison.OrdinalIgnoreCase))
+        {
+            var suffixedTicker = $"{ticker}.PL";
+            traceLogs?.Add($"Stooq: History empty for {ticker}, retrying with {suffixedTicker}");
+            history = await FetchHistoryAsync(suffixedTicker, symbol, from, to, cancellationToken, traceLogs);
+        }
+
+        return history;
+    }
+
+    private async Task<List<MarketPrice>> FetchHistoryAsync(string ticker, Domain.ValueObjects.Symbol symbol, DateTime from, DateTime to, CancellationToken cancellationToken, List<string>? traceLogs)
+    {
+        // Stooq daily history CSV: s=ticker & i=d (daily)
+        var url = $"https://stooq.pl/q/d/l/?s={ticker.ToUpper()}&i=d";
+        traceLogs?.Add($"Stooq History: Querying {url}");
+
+        try
+        {
+            var csvContent = await _pipeline.ExecuteAsync(async token =>
+               await _httpClient.GetStringAsync(url, token), cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(csvContent)) return new List<MarketPrice>();
+
+            var lines = csvContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            // Expect header: Data,Otwarcie,Najwyzszy,Najnizszy,Zamkniecie,Wolumen
+            if (lines.Length < 2) return new List<MarketPrice>();
+
+            var result = new List<MarketPrice>();
+            var isBond = symbol.AssetType == Domain.Enums.AssetType.Bond;
+
+            // Process from line 1
+            foreach (var line in lines.Skip(1))
+            {
+                var parts = line.Split(',');
+                if (parts.Length < 6) continue;
+
+                // Date format varies, usually yyyy-MM-dd
+                if (!DateTime.TryParse(parts[0], CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)) continue;
+
+                // Filter by range early
+                if (date < from || date > to) continue;
+
+                // Parse OHLVC
+                if (!decimal.TryParse(parts[4], NumberStyles.Any, CultureInfo.InvariantCulture, out var close)) continue;
+                decimal.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out var open);
+                decimal.TryParse(parts[2], NumberStyles.Any, CultureInfo.InvariantCulture, out var high);
+                decimal.TryParse(parts[3], NumberStyles.Any, CultureInfo.InvariantCulture, out var low);
+                long.TryParse(parts[5], NumberStyles.Any, CultureInfo.InvariantCulture, out var vol);
+
+                // Infer currency (simplified)
+                var currency = "PLN";
+                if (ticker.EndsWith(".US")) currency = "USD";
+                else if (ticker.EndsWith(".DE")) currency = "EUR";
+                else if (ticker.EndsWith(".UK")) currency = "GBP";
+
+                // Stooq Bonds are %
+                if (isBond && close < 200) // Heuristic check for percentage pricing vs absolute
+                {
+                    // Actually for history we store as is. 
+                    // The ValuationService handles the logic.
+                }
+
+                result.Add(new MarketPrice
+                {
+                    Symbol = symbol.Ticker,
+                    // Timestamp maps to date for Daily data
+                    Timestamp = date,
+                    Price = close,
+                    Open = open,
+                    High = high,
+                    Low = low,
+                    Close = close,
+                    Volume = vol,
+                    Currency = currency,
+                    Source = "Stooq"
+                });
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching history for {Ticker} from Stooq", ticker);
+            return new List<MarketPrice>();
+        }
     }
 
     public async Task<IEnumerable<SecurityInfo>> SearchSecuritiesAsync(string query, CancellationToken cancellationToken = default)

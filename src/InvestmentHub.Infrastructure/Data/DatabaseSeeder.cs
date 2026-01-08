@@ -16,7 +16,7 @@ public static class DatabaseSeeder
     /// </summary>
     /// <param name="serviceProvider">The service provider to create scopes for background tasks</param>
     /// <param name="yahooQuotes">The YahooQuotes service</param>
-    public static async Task SeedAsync(IServiceProvider serviceProvider, YahooQuotesApi.YahooQuotes yahooQuotes)
+    public static async Task SeedAsync(IServiceProvider serviceProvider, YahooQuotesApi.YahooQuotes yahooQuotes, InvestmentHub.Infrastructure.Jobs.HistoricalImportJob historicalImportJob)
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -26,60 +26,60 @@ public static class DatabaseSeeder
         await context.Database.MigrateAsync();
 
         // 2. Seed Core Data (Users/Portfolios) (Synchronous - Fast & Required)
-        if (!await context.DomainUsers.AnyAsync())
-        {
-            var users = new List<User>
-            {
-                new User(UserId.New(), "Jan Kowalski", "jan.kowalski@example.com", DateTime.UtcNow.AddDays(-30)),
-                new User(UserId.New(), "Anna Nowak", "anna.nowak@example.com", DateTime.UtcNow.AddDays(-25)),
-                new User(UserId.New(), "Piotr Wiśniewski", "piotr.wisniewski@example.com", DateTime.UtcNow.AddDays(-20))
-            };
-            await context.DomainUsers.AddRangeAsync(users);
-            await context.SaveChangesAsync();
+        //if (!await context.DomainUsers.AnyAsync())
+        //{
+        //    var users = new List<User>
+        //    {
+        //        new User(UserId.New(), "Jan Kowalski", "jan.kowalski@example.com", DateTime.UtcNow.AddDays(-30)),
+        //        new User(UserId.New(), "Anna Nowak", "anna.nowak@example.com", DateTime.UtcNow.AddDays(-25)),
+        //        new User(UserId.New(), "Piotr Wiśniewski", "piotr.wisniewski@example.com", DateTime.UtcNow.AddDays(-20))
+        //    };
+        //    await context.DomainUsers.AddRangeAsync(users);
+        //    await context.SaveChangesAsync();
 
-            var portfolios = new List<Portfolio>
-            {
-                new Portfolio(PortfolioId.New(), "Główny Portfel", "Mój główny portfel inwestycyjny z długoterminowymi inwestycjami", users[0].Id),
-                new Portfolio(PortfolioId.New(), "Portfel Agresywny", "Portfel z wysokim ryzykiem i wysokim potencjałem zysku", users[0].Id),
-                new Portfolio(PortfolioId.New(), "Portfel Konserwatywny", "Bezpieczny portfel z niskim ryzykiem", users[1].Id),
-                new Portfolio(PortfolioId.New(), "Portfel ETF", "Portfel skupiony na funduszach ETF", users[2].Id)
-            };
-            await context.Portfolios.AddRangeAsync(portfolios);
-            await context.SaveChangesAsync();
+        //    var portfolios = new List<Portfolio>
+        //    {
+        //        new Portfolio(PortfolioId.New(), "Główny Portfel", "Mój główny portfel inwestycyjny z długoterminowymi inwestycjami", users[0].Id),
+        //        new Portfolio(PortfolioId.New(), "Portfel Agresywny", "Portfel z wysokim ryzykiem i wysokim potencjałem zysku", users[0].Id),
+        //        new Portfolio(PortfolioId.New(), "Portfel Konserwatywny", "Bezpieczny portfel z niskim ryzykiem", users[1].Id),
+        //        new Portfolio(PortfolioId.New(), "Portfel ETF", "Portfel skupiony na funduszach ETF", users[2].Id)
+        //    };
+        //    await context.Portfolios.AddRangeAsync(portfolios);
+        //    await context.SaveChangesAsync();
 
-            var investments = new List<Investment>
-            {
-                // Jan Kowalski - Główny Portfel
-                new Investment(InvestmentId.New(), portfolios[0].Id, new Symbol("AAPL", "NASDAQ", AssetType.Stock), new Money(150.00m, Currency.USD), 10m, DateTime.UtcNow.AddDays(-60)),
-                new Investment(InvestmentId.New(), portfolios[0].Id, new Symbol("MSFT", "NASDAQ", AssetType.Stock), new Money(300.00m, Currency.USD), 5m, DateTime.UtcNow.AddDays(-45)),
-                new Investment(InvestmentId.New(), portfolios[0].Id, new Symbol("GOOGL", "NASDAQ", AssetType.Stock), new Money(2500.00m, Currency.USD), 2m, DateTime.UtcNow.AddDays(-30)),
+        //    var investments = new List<Investment>
+        //    {
+        //        // Jan Kowalski - Główny Portfel
+        //        new Investment(InvestmentId.New(), portfolios[0].Id, new Symbol("AAPL", "NASDAQ", AssetType.Stock), new Money(150.00m, Currency.USD), 10m, DateTime.UtcNow.AddDays(-60)),
+        //        new Investment(InvestmentId.New(), portfolios[0].Id, new Symbol("MSFT", "NASDAQ", AssetType.Stock), new Money(300.00m, Currency.USD), 5m, DateTime.UtcNow.AddDays(-45)),
+        //        new Investment(InvestmentId.New(), portfolios[0].Id, new Symbol("GOOGL", "NASDAQ", AssetType.Stock), new Money(2500.00m, Currency.USD), 2m, DateTime.UtcNow.AddDays(-30)),
 
-                // Jan Kowalski - Portfel Agresywny
-                new Investment(InvestmentId.New(), portfolios[1].Id, new Symbol("TSLA", "NASDAQ", AssetType.Stock), new Money(200.00m, Currency.USD), 25m, DateTime.UtcNow.AddDays(-20)),
-                new Investment(InvestmentId.New(), portfolios[1].Id, new Symbol("NVDA", "NASDAQ", AssetType.Stock), new Money(400.00m, Currency.USD), 10m, DateTime.UtcNow.AddDays(-15)),
+        //        // Jan Kowalski - Portfel Agresywny
+        //        new Investment(InvestmentId.New(), portfolios[1].Id, new Symbol("TSLA", "NASDAQ", AssetType.Stock), new Money(200.00m, Currency.USD), 25m, DateTime.UtcNow.AddDays(-20)),
+        //        new Investment(InvestmentId.New(), portfolios[1].Id, new Symbol("NVDA", "NASDAQ", AssetType.Stock), new Money(400.00m, Currency.USD), 10m, DateTime.UtcNow.AddDays(-15)),
 
-                // Anna Nowak - Portfel Konserwatywny
-                new Investment(InvestmentId.New(), portfolios[2].Id, new Symbol("JNJ", "NYSE", AssetType.Stock), new Money(160.00m, Currency.USD), 20m, DateTime.UtcNow.AddDays(-40)),
-                new Investment(InvestmentId.New(), portfolios[2].Id, new Symbol("PG", "NYSE", AssetType.Stock), new Money(140.00m, Currency.USD), 15m, DateTime.UtcNow.AddDays(-35)),
+        //        // Anna Nowak - Portfel Konserwatywny
+        //        new Investment(InvestmentId.New(), portfolios[2].Id, new Symbol("JNJ", "NYSE", AssetType.Stock), new Money(160.00m, Currency.USD), 20m, DateTime.UtcNow.AddDays(-40)),
+        //        new Investment(InvestmentId.New(), portfolios[2].Id, new Symbol("PG", "NYSE", AssetType.Stock), new Money(140.00m, Currency.USD), 15m, DateTime.UtcNow.AddDays(-35)),
 
-                // Piotr Wiśniewski - Portfel ETF
-                new Investment(InvestmentId.New(), portfolios[3].Id, new Symbol("SPY", "NYSE", AssetType.ETF), new Money(400.00m, Currency.USD), 5m, DateTime.UtcNow.AddDays(-25)),
-                new Investment(InvestmentId.New(), portfolios[3].Id, new Symbol("QQQ", "NASDAQ", AssetType.ETF), new Money(350.00m, Currency.USD), 8m, DateTime.UtcNow.AddDays(-20))
-            };
+        //        // Piotr Wiśniewski - Portfel ETF
+        //        new Investment(InvestmentId.New(), portfolios[3].Id, new Symbol("SPY", "NYSE", AssetType.ETF), new Money(400.00m, Currency.USD), 5m, DateTime.UtcNow.AddDays(-25)),
+        //        new Investment(InvestmentId.New(), portfolios[3].Id, new Symbol("QQQ", "NASDAQ", AssetType.ETF), new Money(350.00m, Currency.USD), 8m, DateTime.UtcNow.AddDays(-20))
+        //    };
 
-            // Update current values
-            foreach (var investment in investments)
-            {
-                var priceChange = Random.Shared.Next(-20, 30) / 100m;
-                var currentPricePerUnit = investment.PurchasePrice.Amount * (1 + priceChange);
-                investment.UpdateCurrentValue(new Money(currentPricePerUnit, investment.PurchasePrice.Currency));
-            }
+        //    // Update current values
+        //    foreach (var investment in investments)
+        //    {
+        //        var priceChange = Random.Shared.Next(-20, 30) / 100m;
+        //        var currentPricePerUnit = investment.PurchasePrice.Amount * (1 + priceChange);
+        //        investment.UpdateCurrentValue(new Money(currentPricePerUnit, investment.PurchasePrice.Currency));
+        //    }
 
-            await context.Investments.AddRangeAsync(investments);
-            await context.SaveChangesAsync();
+        //    await context.Investments.AddRangeAsync(investments);
+        //    await context.SaveChangesAsync();
 
-            Console.WriteLine("Core database seeded successfully with sample data!");
-        }
+        //    Console.WriteLine("Core database seeded successfully with sample data!");
+        //}
 
         // 3. Import Instruments (Background - runs after app starts)
         _ = Task.Run(async () =>
@@ -122,6 +122,42 @@ public static class DatabaseSeeder
             catch (Exception ex)
             {
                 Console.WriteLine($"Background import failed: {ex.Message}");
+            }
+        });
+
+        // 4. Trigger Historical Import for Seeded Portfolios (Background)
+        // We do this after instruments start importing so that context is available, 
+        // though imports are independent.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                // Create scope for history job execution if needed, but here we reuse the job singleton/scoped service from main scope
+                // or create new scope if it depends on DbContext.
+                // HistoricalImportJob takes DbContext, so we need a scope.
+                using var historyScope = serviceProvider.CreateScope();
+                var job = historyScope.ServiceProvider.GetRequiredService<Jobs.HistoricalImportJob>();
+
+                // Get portfolio IDs from DB using the scope
+                // Get portfolio IDs from Marten Read Side (since CQRS writes there)
+                // var context = historyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>(); 
+                // var portfolios = await context.Portfolios.ToListAsync(); // This reads from EF Core table which might be empty/stale
+
+                // Use Marten QuerySession via IDocumentStore to be safe
+                var store = historyScope.ServiceProvider.GetRequiredService<global::Marten.IDocumentStore>();
+                using var querySession = store.QuerySession();
+                var portfolios = querySession.Query<Domain.ReadModels.PortfolioReadModel>().ToList();
+
+                foreach (var portfolio in portfolios)
+                {
+                    Console.WriteLine($"Starting background history import for portfolio: {portfolio.Name}...");
+                    await job.ImportPortfolioHistoryAsync(portfolio.Id);
+                }
+                Console.WriteLine("Background history import completed.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Background history import failed: {ex.Message}");
             }
         });
     }

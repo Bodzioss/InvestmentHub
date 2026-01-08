@@ -32,7 +32,9 @@ public class YahooMarketDataProvider : IMarketDataProvider
     public async Task<MarketPrice?> GetLatestPriceAsync(Domain.ValueObjects.Symbol symbol, CancellationToken cancellationToken = default, List<string>? traceLogs = null)
     {
         var ticker = symbol.Ticker;
-        if ((symbol.Exchange == "GPW" || symbol.Exchange == "WSE" || symbol.Exchange == "WAR" || symbol.Exchange == "NewConnect" || symbol.Exchange == "Catalyst") && !ticker.EndsWith(".WA"))
+        if ((symbol.Exchange == "GPW" || symbol.Exchange == "WSE" || symbol.Exchange == "WAR" || symbol.Exchange == "NewConnect" || symbol.Exchange == "Catalyst") &&
+            !ticker.EndsWith(".WA") &&
+            !ticker.Contains("."))
         {
             ticker += ".WA";
             traceLogs?.Add($"Yahoo: Polish exchange detected ({symbol.Exchange}), added .WA suffix -> {ticker}");

@@ -10,11 +10,11 @@ using Pgvector;
 
 #nullable disable
 
-namespace InvestmentHub.Infrastructure.Data.Migrations
+namespace InvestmentHub.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260106110523_ExtendTransactionTickerTo50")]
-    partial class ExtendTransactionTickerTo50
+    [Migration("20260108074654_InitialSchema")]
+    partial class InitialSchema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -62,7 +62,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnName("TaxRate");
 
                     b.Property<DateTime>("TransactionDate")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("TransactionDate");
 
                     b.Property<string>("Type")
@@ -95,11 +95,11 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
 
                     b.Property<string>("Currency")
                         .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<DateTime>("FetchedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("decimal(18,2)");
@@ -111,8 +111,8 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
 
                     b.Property<string>("Symbol")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
@@ -139,7 +139,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Vector>("Embedding")
                         .IsRequired()
@@ -158,6 +158,65 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                     b.ToTable("DocumentChunks", (string)null);
                 });
 
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.EtfDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("AnnualFeePercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal?>("AssetsMillionsEur")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("DistributionType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Domicile")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ExtendedTicker")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Manager")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Replication")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Theme")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("YearAdded")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstrumentId")
+                        .IsUnique();
+
+                    b.ToTable("EtfDetails", (string)null);
+                });
+
             modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
                 {
                     b.Property<Guid>("Id")
@@ -173,7 +232,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("FileName")
                         .IsRequired()
@@ -231,8 +290,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Isin")
-                        .IsUnique();
+                    b.HasIndex("Isin");
 
                     b.ToTable("Instruments", (string)null);
                 });
@@ -251,7 +309,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("EndDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("InterestRate")
                         .HasPrecision(5, 2)
@@ -261,7 +319,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("StartDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("Id");
 
@@ -280,14 +338,14 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnName("Id");
 
                     b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("PortfolioId")
                         .HasColumnType("uuid")
                         .HasColumnName("PortfolioId");
 
                     b.Property<DateTime>("PurchaseDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 8)
@@ -316,7 +374,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnName("Id");
 
                     b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -324,7 +382,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -367,14 +425,14 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("IssueDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("Margin")
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
 
                     b.Property<DateTime>("MaturityDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("NominalValue")
                         .HasPrecision(18, 2)
@@ -404,7 +462,7 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                         .HasColumnName("Id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -795,6 +853,17 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
                     b.Navigation("Report");
                 });
 
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.EtfDetails", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
+                        .WithOne("EtfDetails")
+                        .HasForeignKey("InvestmentHub.Domain.Entities.EtfDetails", "InstrumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Instrument");
+                });
+
             modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
                 {
                     b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
@@ -1023,6 +1092,8 @@ namespace InvestmentHub.Infrastructure.Data.Migrations
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Instrument", b =>
                 {
                     b.Navigation("BondDetails");
+
+                    b.Navigation("EtfDetails");
                 });
 
             modelBuilder.Entity("InvestmentHub.Domain.Entities.TreasuryBondDetails", b =>

@@ -54,7 +54,11 @@ public class InstrumentImporter
                     continue;
 
                 var symbol = new Domain.ValueObjects.Symbol(item.ShortName, exchange, assetType);
-                var instrument = new Instrument(symbol, item.Name, item.Isin);
+                // Ensure ISIN is max 20 chars
+                var safeIsin = item.Isin?.Trim();
+                if (safeIsin != null && safeIsin.Length > 20) safeIsin = safeIsin.Substring(0, 20);
+
+                var instrument = new Instrument(symbol, item.Name, safeIsin);
 
                 instruments.Add(instrument);
                 existingIsinSet.Add(item.Isin);
@@ -322,6 +326,7 @@ public class InstrumentImporter
                 // Parse ISIN (col 3)
                 var isin = parts.Length > 3 ? parts[3].Trim() : "";
                 if (string.IsNullOrEmpty(isin)) continue;
+                if (isin.Length > 20) isin = isin.Substring(0, 20); // Truncate to DB limit
 
                 // Parse ticker from column 1 (simple ticker like "XMKA")
                 var ticker = parts[1].Trim();
@@ -493,6 +498,7 @@ public class InstrumentImporter
 
             // Generate dummy ISIN consistently
             var dummyIsin = $"US{ticker.PadRight(10, 'X')}";
+            if (dummyIsin.Length > 20) dummyIsin = dummyIsin.Substring(0, 20);
 
             // Check if Ticker OR ISIN already exists
             if (existingTickers.Contains(ticker) || existingIsins.Contains(dummyIsin))
@@ -534,37 +540,41 @@ public class InstrumentImporter
                 await _context.SaveChangesAsync();
                 Console.WriteLine($"Imported {instruments.Count} Global instruments.");
             }
-            catch (DbUpdateException ex)
+            catch (Exception ex) // Catch generic exception to handle duplicates AND other DbUpdateErrors
             {
-                Console.WriteLine($"Bulk import failed due to duplicates: {ex.Message}. Retrying individually...");
+                Console.WriteLine($"Bulk import failed: {ex.Message}. Retrying individually...");
                 _context.ChangeTracker.Clear();
 
-                // Fallback: Save one by one to skip duplicates that might have been missed (e.g. race condition or case sensitivity)
+                // Fallback: Save one by one
                 var importedCount = 0;
                 foreach (var instrument in instruments)
                 {
                     try
                     {
-                        // Re-check existence against DB just in case
+                        // Check logic: Ticker OR ISIN match
                         var exists = await _context.Instruments.AnyAsync(i => i.Symbol.Ticker == instrument.Symbol.Ticker || i.Isin == instrument.Isin);
+
                         if (!exists)
                         {
                             _context.Instruments.Add(instrument);
                             await _context.SaveChangesAsync();
                             importedCount++;
                         }
+                        else
+                        {
+                            // Optional: UpSert logic if needed, but for now just skip
+                        }
                     }
-                    catch
+                    catch (Exception innerEx)
                     {
-                        // Ignore duplicate errors during individual save as requested
+                        Console.WriteLine($"Failed to import {instrument.Symbol.Ticker}: {innerEx.Message}");
                         _context.ChangeTracker.Clear();
                     }
                 }
-                Console.WriteLine($"Imported {importedCount} Global instruments (fallback mode).");
+                Console.WriteLine($"Recovered {importedCount} instruments individually.");
             }
         }
     }
-
     private sealed class RootObject
     {
         [JsonPropertyName("r_")]
@@ -586,7 +596,7 @@ public class InstrumentImporter
         public string Isin { get; set; } = string.Empty;
     }
 
-    private class GlobalInstrumentItem
+    private sealed class GlobalInstrumentItem
     {
         [JsonPropertyName("NASDAQ Symbol")]
         public string NasdaqSymbol { get; set; }
@@ -599,7 +609,5 @@ public class InstrumentImporter
 
         [JsonPropertyName("Exchange")]
         public string Exchange { get; set; }
-
-        // Other fields ignored for now
     }
-}
+} // End of InstrumentImporter class

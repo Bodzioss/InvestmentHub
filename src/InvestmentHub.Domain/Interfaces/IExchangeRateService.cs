@@ -26,4 +26,10 @@ public interface IExchangeRateService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Converted money in target currency or null if rate not found</returns>
     Task<Money?> ConvertAsync(decimal amount, Currency fromCurrency, Currency toCurrency, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the historical exchange rate for a specific date.
+    /// Uses closest available previous date if exact date is missing.
+    /// </summary>
+    Task<decimal?> GetHistoricalExchangeRateAsync(Currency fromCurrency, Currency toCurrency, DateTime date, CancellationToken cancellationToken = default);
 }

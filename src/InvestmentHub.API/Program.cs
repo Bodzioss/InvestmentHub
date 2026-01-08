@@ -34,6 +34,9 @@ using YahooQuotesApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Enable legacy timestamp behavior for Npgsql/Marten compatibility with DateTimeKind.Utc
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 builder.AddServiceDefaults();
 
 // Add database connection with pgvector support
@@ -119,7 +122,9 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 
 // Register domain services
+// Register domain services
 builder.Services.AddScoped<IPortfolioValuationService, PortfolioValuationService>();
+builder.Services.AddScoped<IPortfolioHistoryService, InvestmentHub.Infrastructure.Services.PortfolioHistoryService>();
 
 // Add resilience services
 builder.Services.AddResilienceServices();
@@ -320,7 +325,8 @@ using (var scope = app.Services.CreateScope())
 
     // Use ServiceProvider to allow Seeder to create background scopes
     var yahooQuotes = scope.ServiceProvider.GetRequiredService<YahooQuotesApi.YahooQuotes>();
-    await DatabaseSeeder.SeedAsync(scope.ServiceProvider, yahooQuotes);
+    var historicalImportJob = scope.ServiceProvider.GetRequiredService<InvestmentHub.Infrastructure.Jobs.HistoricalImportJob>();
+    await DatabaseSeeder.SeedAsync(scope.ServiceProvider, yahooQuotes, historicalImportJob);
 }
 
 // Configure the HTTP request pipeline.

@@ -1,7 +1,9 @@
 using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.Interfaces;
+using InvestmentHub.Domain.Entities;
 using InvestmentHub.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
+using Marten;
 
 namespace InvestmentHub.Infrastructure.Services;
 
@@ -12,13 +14,16 @@ namespace InvestmentHub.Infrastructure.Services;
 public class ExchangeRateService : IExchangeRateService
 {
     private readonly MarketPriceService _marketPriceService;
+    private readonly IQuerySession _querySession;
     private readonly ILogger<ExchangeRateService> _logger;
 
     public ExchangeRateService(
         MarketPriceService marketPriceService,
+        IQuerySession querySession,
         ILogger<ExchangeRateService> logger)
     {
         _marketPriceService = marketPriceService;
+        _querySession = querySession;
         _logger = logger;
     }
 
@@ -85,5 +90,49 @@ public class ExchangeRateService : IExchangeRateService
         }
 
         return null;
+    }
+
+    public async Task<decimal?> GetHistoricalExchangeRateAsync(Currency fromCurrency, Currency toCurrency, DateTime date, CancellationToken cancellationToken = default)
+    {
+        if (fromCurrency == toCurrency) return 1.0m;
+
+        try
+        {
+            // Normalize date to UTC/Midnight
+            var queryDate = date.Date;
+
+            // Strategy: Check local DB (Marten) for PriceHistory
+            // We look for dates <= queryDate to find the closest previous rate (known as "As Of" date)
+            // Limit lookback to e.g. 7 days to avoid using very stale data
+            var lookbackDate = queryDate.AddDays(-7);
+
+            var pairTickerRaw = $"{fromCurrency}{toCurrency}"; // e.g. EURPLN
+
+            var rate = await GetRateFromDbAsync(pairTickerRaw, queryDate, lookbackDate, cancellationToken);
+            if (rate.HasValue) return rate;
+
+            // Try inverse
+            var inverseTickerRaw = $"{toCurrency}{fromCurrency}"; // e.g. PLNEUR
+            var inverseRate = await GetRateFromDbAsync(inverseTickerRaw, queryDate, lookbackDate, cancellationToken);
+            if (inverseRate.HasValue && inverseRate.Value > 0) return 1.0m / inverseRate.Value;
+
+            _logger.LogWarning("No historical rate found for {From}->{To} on {Date}", fromCurrency, toCurrency, date.ToShortDateString());
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching historical exchange rate for {From}->{To} on {Date}", fromCurrency, toCurrency, date);
+            return null;
+        }
+    }
+
+    private async Task<decimal?> GetRateFromDbAsync(string ticker, DateTime maxDate, DateTime minDate, CancellationToken token)
+    {
+        var history = await _querySession.Query<PriceHistory>()
+            .Where(x => x.Symbol == ticker && x.Date <= maxDate && x.Date >= minDate)
+            .OrderByDescending(x => x.Date)
+            .FirstOrDefaultAsync(token);
+
+        return history?.Close;
     }
 }

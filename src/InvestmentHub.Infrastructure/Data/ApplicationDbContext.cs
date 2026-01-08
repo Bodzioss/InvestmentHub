@@ -52,6 +52,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.HasPostgresExtension("vector");
 
         // Configure User entity
         builder.Entity<User>(entity =>
@@ -166,7 +167,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             {
                 symbol.Property(s => s.Ticker)
                     .HasColumnName("SymbolTicker")
-                    .HasMaxLength(10)
+                    .HasMaxLength(50)
                     .IsRequired();
 
                 symbol.Property(s => s.Exchange)
@@ -192,7 +193,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 money.Property(m => m.Currency)
                     .HasColumnName("CurrentValueCurrency")
                     .HasConversion<string>()
-                    .HasMaxLength(3)
+                    .HasMaxLength(10)
                     .IsRequired();
             });
 
@@ -206,7 +207,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 money.Property(m => m.Currency)
                     .HasColumnName("PurchasePriceCurrency")
                     .HasConversion<string>()
-                    .HasMaxLength(3)
+                    .HasMaxLength(10)
                     .IsRequired();
             });
 
@@ -242,7 +243,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasKey(c => c.Id);
 
             entity.Property(c => c.Symbol)
-                .HasMaxLength(10)
+                .HasMaxLength(50)
                 .IsRequired();
 
             entity.Property(c => c.Price)
@@ -250,7 +251,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .IsRequired();
 
             entity.Property(c => c.Currency)
-                .HasMaxLength(3)
+                .HasMaxLength(10)
                 .IsRequired();
 
             entity.Property(c => c.FetchedAt)

@@ -186,7 +186,12 @@ public class MyFundCsvParser
         var currencyStr = GetValue("Waluta");
         var quantityStr = GetValue("Liczba jednostek");
         var priceStr = GetValue("Cena");
-        var valueStr = GetValue("Prowizja dla kupna");
+        var valueStr = GetValue("Wartość");
+        if (string.IsNullOrWhiteSpace(valueStr))
+        {
+            // Fallback to "Prowizja dla kupna" if Wartość is missing (legacy support?)
+            valueStr = GetValue("Prowizja dla kupna");
+        }
         var notes = GetValue("Komentarz");
 
         // Skip if no date or operation
@@ -223,12 +228,28 @@ public class MyFundCsvParser
             decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out pricePerUnit);
         }
 
-        // Parse total value if available
-        decimal totalValue = quantity * pricePerUnit;
+        // Parse total value from "Wartość" column
+        decimal totalValue = 0;
         if (!string.IsNullOrWhiteSpace(valueStr))
         {
             valueStr = valueStr.Replace(',', '.').Replace(" ", "").Replace("zł", "").Trim();
             decimal.TryParse(valueStr, NumberStyles.Any, CultureInfo.InvariantCulture, out totalValue);
+        }
+        else
+        {
+            // Fallback calculation for standard trades
+            totalValue = quantity * pricePerUnit;
+        }
+
+        var transactionType = new ParsedTransaction { OperationType = operation }.GetTransactionType();
+
+        // SPECIAL HANDLING: Dividends and Interest
+        if (transactionType == TransactionType.DIVIDEND || transactionType == TransactionType.INTEREST)
+        {
+            // Ensure Quantity is 1 and Price matches the Total Value (Income Amount)
+            // This ensures ImportController calculates GrossAmount correctly (Qty * Price)
+            quantity = 1;
+            pricePerUnit = totalValue;
         }
 
         // Extract ticker from "Walor" (e.g., "CDPROJECT (CDR)" -> "CDR")

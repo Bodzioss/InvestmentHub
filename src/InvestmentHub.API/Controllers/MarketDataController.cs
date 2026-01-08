@@ -101,4 +101,11 @@ public class MarketDataController : ControllerBase
 
         return Accepted(new { Message = $"Import started for {symbol}" });
     }
+
+    [HttpPost("import-portfolio/{portfolioId}")]
+    public IActionResult ImportPortfolioHistory(Guid portfolioId)
+    {
+        Hangfire.BackgroundJob.Enqueue<HistoricalImportJob>(job => job.ImportPortfolioHistoryAsync(portfolioId));
+        return Accepted(new { Message = $"Historical import started for portfolio {portfolioId}" });
+    }
 }

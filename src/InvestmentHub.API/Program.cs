@@ -34,18 +34,24 @@ using YahooQuotesApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Enable legacy timestamp behavior for Npgsql/Marten compatibility with DateTimeKind.Utc
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 builder.AddServiceDefaults();
 
-// Add database connection
+// Add database connection with pgvector support
 builder.AddNpgsqlDbContext<ApplicationDbContext>("postgres", configureDbContextOptions: options =>
 {
     options.UseNpgsql(npgsqlOptions =>
     {
+        npgsqlOptions.UseVector();
         npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 3,
             maxRetryDelay: TimeSpan.FromSeconds(10),
             errorCodesToAdd: null);
     });
+    // Suppress pending model changes warning - we use manual SQL migrations for pgvector tables
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 });
 
 // Configure Marten for Event Sourcing
@@ -113,9 +119,12 @@ builder.Services.AddScoped<InvestmentHub.Domain.Services.IMetricsRecorder, Inves
 builder.Services.AddScoped<IInvestmentRepository, InvestmentRepository>();
 builder.Services.AddScoped<IPortfolioRepository, PortfolioRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 
 // Register domain services
+// Register domain services
 builder.Services.AddScoped<IPortfolioValuationService, PortfolioValuationService>();
+builder.Services.AddScoped<IPortfolioHistoryService, InvestmentHub.Infrastructure.Services.PortfolioHistoryService>();
 
 // Add resilience services
 builder.Services.AddResilienceServices();
@@ -165,7 +174,10 @@ builder.Services.AddMediatR(cfg =>
 {
     // Register all handlers from the Domain assembly
     cfg.RegisterServicesFromAssembly(typeof(AddInvestmentCommandHandler).Assembly);
-    
+
+    // Register all handlers from the Infrastructure assembly (transaction handlers)
+    cfg.RegisterServicesFromAssembly(typeof(InvestmentHub.Infrastructure.Handlers.Queries.GetTransactionsQueryHandler).Assembly);
+
     // Register pipeline behaviors
     cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
     cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
@@ -173,7 +185,7 @@ builder.Services.AddMediatR(cfg =>
 });
 
 // Add MassTransit for messaging
-var rabbitMqConnectionString = builder.Configuration["RabbitMQ:ConnectionString"] 
+var rabbitMqConnectionString = builder.Configuration["RabbitMQ:ConnectionString"]
     ?? "amqp://guest:guest@localhost:5672/";
 
 // If Aspire endpoint doesn't include credentials, add them
@@ -190,7 +202,7 @@ builder.Services.AddMassTransit(x =>
     {
         // Simple configuration - MassTransit will parse the connection string
         cfg.Host(rabbitMqConnectionString);
-        
+
         // Configure global retry policy with Exponential Backoff
         cfg.UseMessageRetry(r => r.Exponential(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(2)));
 
@@ -205,13 +217,29 @@ builder.Services.AddInfrastructureHealthChecks(builder.Configuration, builder.En
 // Register YahooQuotes service
 builder.Services.AddSingleton(new YahooQuotesBuilder().Build());
 
-// Add Market Data Provider
+// Add Market Data Providers
+builder.Services.AddScoped<IMarketDataProvider, StooqMarketDataProvider>();
 builder.Services.AddScoped<IMarketDataProvider, YahooMarketDataProvider>();
+builder.Services.AddScoped<IMarketPriceRepository, InvestmentHub.Infrastructure.Repositories.MarketPriceRepository>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.Services.MarketPriceService>();
+builder.Services.AddScoped<IExchangeRateService, InvestmentHub.Infrastructure.Services.ExchangeRateService>();
+
+// Add AI Services
+builder.Services.AddScoped<InvestmentHub.Infrastructure.AI.IGeminiService, InvestmentHub.Infrastructure.AI.GeminiService>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.AI.DocumentProcessor>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.AI.VectorSearchService>();
+
+// Add Treasury Bonds Services
+builder.Services.AddScoped<InvestmentHub.Infrastructure.TreasuryBonds.BondValueCalculator>();
+builder.Services.AddScoped<InvestmentHub.Infrastructure.TreasuryBonds.BondDataProvider>();
 
 // Add Background Jobs
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.PriceUpdateJob>();
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Jobs.HistoricalImportJob>();
 builder.Services.AddScoped<InvestmentHub.Infrastructure.Data.InstrumentImporter>();
+
+// Add CSV Import Services
+builder.Services.AddScoped<InvestmentHub.Infrastructure.Services.MyFundCsvParser>();
 
 // Add Hangfire services
 builder.Services.AddHangfireServices(builder.Configuration);
@@ -253,7 +281,7 @@ builder.Services.AddScoped<INotificationService, InvestmentHub.API.Services.Sign
 // Configure Forwarded Headers for Azure Container Apps (Reverse Proxy)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | 
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
                                Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
     // Trust all networks - Azure Load Balancer can come from any internal IP
     options.KnownNetworks.Clear();
@@ -290,9 +318,15 @@ else
 // Ensure database is created and seeded
 using (var scope = app.Services.CreateScope())
 {
+    // Apply pending migrations first
+    var dbContext = scope.ServiceProvider.GetRequiredService<InvestmentHub.Infrastructure.Data.ApplicationDbContext>();
+    await dbContext.Database.MigrateAsync();
+    logger.LogInformation("Database migrations applied successfully");
+
     // Use ServiceProvider to allow Seeder to create background scopes
     var yahooQuotes = scope.ServiceProvider.GetRequiredService<YahooQuotesApi.YahooQuotes>();
-    await DatabaseSeeder.SeedAsync(scope.ServiceProvider, yahooQuotes);
+    var historicalImportJob = scope.ServiceProvider.GetRequiredService<InvestmentHub.Infrastructure.Jobs.HistoricalImportJob>();
+    await DatabaseSeeder.SeedAsync(scope.ServiceProvider, yahooQuotes, historicalImportJob);
 }
 
 // Configure the HTTP request pipeline.
@@ -322,6 +356,9 @@ app.UseCors("AllowAll");
 // Add Correlation ID middleware after CORS
 // This ensures Correlation ID is available in all subsequent logs
 app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Add Request Timing Middleware to expose backend latency via Server-Timing header
+app.UseMiddleware<RequestTimingMiddleware>();
 
 app.MapHealthChecksUI(options =>
 {

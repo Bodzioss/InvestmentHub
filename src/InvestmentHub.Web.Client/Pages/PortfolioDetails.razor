@@ -461,14 +461,14 @@ else
         var dialog = await DialogService.ShowAsync<EditPortfolioDialog>("Edit Portfolio", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is UpdatePortfolioRequest request)
+        if (!result!.Canceled && result.Data is UpdatePortfolioRequest request)
         {
             try 
             {
                 await PortfoliosApi.UpdatePortfolioAsync(PortfolioId, request);
                 Snackbar.Add("Portfolio updated successfully", Severity.Success);
                 // Reload portfolio to show changes
-                Dispatcher.Dispatch(new LoadPortfoliosAction(UserState.Value.SelectedUserId));
+                Dispatcher.Dispatch(new LoadPortfoliosAction(UserState.Value.SelectedUserId!));
             }
             catch (Refit.ApiException ex)
             {

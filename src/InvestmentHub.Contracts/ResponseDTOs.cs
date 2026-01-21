@@ -14,8 +14,11 @@ public class InvestmentResponseDto
     /// <summary>Gets or sets the symbol information</summary>
     public SymbolResponseDto Symbol { get; set; } = new();
 
-    /// <summary>Gets or sets the current value</summary>
+    /// <summary>Gets or sets the current total value</summary>
     public MoneyResponseDto CurrentValue { get; set; } = new();
+
+    /// <summary>Gets or sets the current price per unit</summary>
+    public MoneyResponseDto? CurrentPrice { get; set; }
 
     /// <summary>Gets or sets the purchase price</summary>
     public MoneyResponseDto PurchasePrice { get; set; } = new();
@@ -31,6 +34,9 @@ public class InvestmentResponseDto
 
     /// <summary>Gets or sets the investment status</summary>
     public string Status { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the unrealized gain/loss</summary>
+    public MoneyResponseDto? UnrealizedGainLoss { get; set; }
 }
 
 /// <summary>
@@ -145,4 +151,65 @@ public class InstrumentDto
     public string Exchange { get; set; } = string.Empty;
     public string AssetType { get; set; } = string.Empty;
     public string Isin { get; set; } = string.Empty;
+    public EtfDetailsDto? EtfDetails { get; set; }
+    public BondDetailsDto? BondDetails { get; set; }
+}
+
+public class EtfDetailsDto
+{
+    public int? YearAdded { get; set; }
+    public string? Region { get; set; }
+    public string? Theme { get; set; }
+    public string? Manager { get; set; }
+    public string? DistributionType { get; set; }
+    public string? Domicile { get; set; }
+    public string? Replication { get; set; }
+    public decimal? AnnualFeePercent { get; set; }
+    public decimal? AssetsMillionsEur { get; set; }
+    public string? Currency { get; set; }
+}
+
+public class BondDetailsDto
+{
+    public string? BondType { get; set; }
+    public decimal? NominalValue { get; set; }
+    public decimal? InterestRate { get; set; }
+    public DateTime? MaturityDate { get; set; }
+    public string? Issuer { get; set; }
+}
+
+/// <summary>
+/// Response DTO for portfolio performance history.
+/// </summary>
+public class PortfolioPerformanceResponse
+{
+    /// <summary>Gets or sets the list of aggregated data points</summary>
+    public List<PerformanceDataPoint> DataPoints { get; set; } = new();
+
+    /// <summary>Gets or sets per-investment value history for detailed analysis</summary>
+    public Dictionary<string, List<PerformanceDataPoint>> InvestmentValues { get; set; } = new();
+
+    /// <summary>Gets or sets the start date of the performance history</summary>
+    public DateTime StartDate { get; set; }
+
+    /// <summary>Gets or sets the end date of the performance history</summary>
+    public DateTime EndDate { get; set; }
+
+    /// <summary>Gets or sets the currency</summary>
+    public string Currency { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// A single data point in the performance chart.
+/// </summary>
+public class PerformanceDataPoint
+{
+    /// <summary>Gets or sets the date for this data point</summary>
+    public DateTime Date { get; set; }
+
+    /// <summary>Gets or sets the portfolio value on this date</summary>
+    public decimal Value { get; set; }
+
+    /// <summary>Gets or sets the total cost (cumulative) up to this date</summary>
+    public decimal TotalCost { get; set; }
 }

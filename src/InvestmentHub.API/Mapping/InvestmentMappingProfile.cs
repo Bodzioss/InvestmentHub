@@ -77,6 +77,11 @@ public class InvestmentMappingProfile : Profile
                 Amount = src.CurrentValue.Amount,
                 Currency = src.CurrentValue.Currency.ToString()
             }))
+            .ForMember(dest => dest.CurrentPrice, opt => opt.MapFrom(src => new MoneyResponseDto
+            {
+                Amount = src.CurrentPrice.Amount,
+                Currency = src.CurrentPrice.Currency.ToString()
+            }))
             .ForMember(dest => dest.PurchasePrice, opt => opt.MapFrom(src => new MoneyResponseDto
             {
                 Amount = src.PurchasePrice.Amount,
@@ -85,7 +90,12 @@ public class InvestmentMappingProfile : Profile
             .ForMember(dest => dest.Quantity, opt => opt.MapFrom(src => src.Quantity))
             .ForMember(dest => dest.PurchaseDate, opt => opt.MapFrom(src => src.PurchaseDate))
             .ForMember(dest => dest.LastUpdated, opt => opt.MapFrom(src => src.LastUpdated))
-            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+            .ForMember(dest => dest.UnrealizedGainLoss, opt => opt.MapFrom(src => new MoneyResponseDto
+            {
+                Amount = src.UnrealizedGainLoss.Amount,
+                Currency = src.UnrealizedGainLoss.Currency.ToString()
+            }));
 
         CreateMap<Investment, InvestmentResponseDto>()
             .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.Value.ToString()))

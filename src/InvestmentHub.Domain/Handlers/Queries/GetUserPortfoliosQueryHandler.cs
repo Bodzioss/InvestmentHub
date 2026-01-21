@@ -45,7 +45,7 @@ public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQu
 
             // Check for cancellation
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             // Query portfolios for this user from read model
             var portfolios = await _session.Query<PortfolioReadModel>()
                 .Where(p => p.OwnerId == request.UserId.Value && !p.IsClosed) // Filter out closed portfolios
@@ -68,26 +68,26 @@ public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQu
             foreach (var p in portfolios)
             {
                 var portfolioInvestments = investments.Where(i => i.PortfolioId == p.Id).ToList();
-                
+
                 // Calculate totals dynamically from active investments
                 var totalValueAmount = portfolioInvestments.Sum(i => i.CurrentValue);
                 var totalCostAmount = portfolioInvestments.Sum(i => i.PurchasePrice * i.Quantity);
                 var totalGainLossAmount = totalValueAmount - totalCostAmount;
-                
+
                 portfolioSummaries.Add(new PortfolioSummary(
                     new PortfolioId(p.Id),
                     p.Name,
                     p.Description,
                     new Money(totalValueAmount, Enum.Parse<Currency>(p.Currency)),
-                    new Money(totalCostAmount, Enum.Parse<Currency>(p.Currency)), 
-                    new Money(Math.Abs(totalGainLossAmount), Enum.Parse<Currency>(p.Currency)), // Gain/Loss magnitude
+                    new Money(totalCostAmount, Enum.Parse<Currency>(p.Currency)),
+                    new Money(totalGainLossAmount, Enum.Parse<Currency>(p.Currency)), // Gain/Loss signed value
                     portfolioInvestments.Count,
                     p.CreatedAt,
                     p.LastUpdated
                 ));
             }
 
-            _logger.LogInformation("Successfully retrieved {Count} portfolios for user {UserId}", 
+            _logger.LogInformation("Successfully retrieved {Count} portfolios for user {UserId}",
                 portfolioSummaries.Count, request.UserId.Value);
 
             return GetUserPortfoliosResult.Success(portfolioSummaries);
@@ -95,7 +95,7 @@ public class GetUserPortfoliosQueryHandler : IRequestHandler<GetUserPortfoliosQu
 
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed to retrieve portfolios for user {UserId}: {Message}", 
+            _logger.LogError(ex, "Failed to retrieve portfolios for user {UserId}: {Message}",
                 request.UserId.Value, ex.Message);
             return GetUserPortfoliosResult.Failure($"Failed to retrieve user portfolios: {ex.Message}");
         }

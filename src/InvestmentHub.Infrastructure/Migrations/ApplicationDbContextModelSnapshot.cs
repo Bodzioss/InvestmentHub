@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 
 #nullable disable
 
@@ -22,6 +23,252 @@ namespace InvestmentHub.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("InvestmentHub.Domain.Aggregates.Transaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("Id");
+
+                    b.Property<DateTime?>("MaturityDate")
+                        .HasColumnType("date")
+                        .HasColumnName("MaturityDate");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("Notes");
+
+                    b.Property<Guid>("PortfolioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("PortfolioId");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)")
+                        .HasColumnName("Quantity");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<decimal?>("TaxRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("TaxRate");
+
+                    b.Property<DateTime>("TransactionDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("TransactionDate");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PortfolioId")
+                        .HasDatabaseName("idx_transactions_portfolio");
+
+                    b.HasIndex("TransactionDate")
+                        .HasDatabaseName("idx_transactions_date");
+
+                    b.HasIndex("Type")
+                        .HasDatabaseName("idx_transactions_type");
+
+                    b.ToTable("Transactions", (string)null);
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.CachedMarketPrice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("FetchedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FetchedAt")
+                        .HasDatabaseName("IX_CachedMarketPrices_FetchedAt");
+
+                    b.HasIndex("Symbol", "FetchedAt")
+                        .HasDatabaseName("IX_CachedMarketPrices_Symbol_FetchedAt");
+
+                    b.ToTable("CachedMarketPrices", (string)null);
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.DocumentChunk", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ChunkIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Vector>("Embedding")
+                        .IsRequired()
+                        .HasColumnType("vector(768)");
+
+                    b.Property<int?>("PageNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportId");
+
+                    b.ToTable("DocumentChunks", (string)null);
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.EtfDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("AnnualFeePercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal?>("AssetsMillionsEur")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("DistributionType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Domicile")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ExtendedTicker")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Manager")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Replication")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Theme")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("YearAdded")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstrumentId")
+                        .IsUnique();
+
+                    b.ToTable("EtfDetails", (string)null);
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BlobUrl")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("ChunkCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Quarter")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReportType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstrumentId", "Year", "Quarter", "ReportType")
+                        .IsUnique();
+
+                    b.ToTable("FinancialReports", (string)null);
+                });
+
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Instrument", b =>
                 {
                     b.Property<Guid>("Id")
@@ -30,20 +277,55 @@ namespace InvestmentHub.Infrastructure.Migrations
 
                     b.Property<string>("Isin")
                         .IsRequired()
-                        .HasMaxLength(12)
-                        .HasColumnType("character varying(12)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Isin")
-                        .IsUnique();
+                    b.HasIndex("Isin");
 
                     b.ToTable("Instruments", (string)null);
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.InterestPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AccruedInterest")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("BondDetailsId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int>("PeriodNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BondDetailsId", "PeriodNumber")
+                        .IsUnique();
+
+                    b.HasIndex("BondDetailsId", "StartDate", "EndDate");
+
+                    b.ToTable("InterestPeriods", (string)null);
                 });
 
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Investment", b =>
@@ -53,22 +335,23 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .HasColumnName("Id");
 
                     b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid>("PortfolioId")
                         .HasColumnType("uuid")
                         .HasColumnName("PortfolioId");
 
                     b.Property<DateTime>("PurchaseDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 8)
                         .HasColumnType("decimal(18,8)");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
@@ -88,7 +371,7 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .HasColumnName("Id");
 
                     b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -96,7 +379,7 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -121,6 +404,54 @@ namespace InvestmentHub.Infrastructure.Migrations
                     b.ToTable("Portfolios", (string)null);
                 });
 
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.TreasuryBondDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("EarlyRedemptionFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("FirstYearRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal>("Margin")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<DateTime>("MaturityDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal>("NominalValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstrumentId")
+                        .IsUnique();
+
+                    b.HasIndex("MaturityDate");
+
+                    b.HasIndex("Type");
+
+                    b.ToTable("TreasuryBondDetails", (string)null);
+                });
+
             modelBuilder.Entity("InvestmentHub.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -128,7 +459,7 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .HasColumnName("Id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -343,6 +674,204 @@ namespace InvestmentHub.Infrastructure.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("InvestmentHub.Domain.Aggregates.Transaction", b =>
+                {
+                    b.OwnsOne("InvestmentHub.Domain.ValueObjects.Money", "Fee", b1 =>
+                        {
+                            b1.Property<Guid>("TransactionIdKey")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("Fee");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("FeeCurrency");
+
+                            b1.HasKey("TransactionIdKey");
+
+                            b1.ToTable("Transactions");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TransactionIdKey");
+                        });
+
+                    b.OwnsOne("InvestmentHub.Domain.ValueObjects.Money", "GrossAmount", b1 =>
+                        {
+                            b1.Property<Guid>("TransactionIdKey")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("GrossAmount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("GrossAmountCurrency");
+
+                            b1.HasKey("TransactionIdKey");
+
+                            b1.ToTable("Transactions");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TransactionIdKey");
+                        });
+
+                    b.OwnsOne("InvestmentHub.Domain.ValueObjects.Money", "NetAmount", b1 =>
+                        {
+                            b1.Property<Guid>("TransactionIdKey")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("NetAmount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("NetAmountCurrency");
+
+                            b1.HasKey("TransactionIdKey");
+
+                            b1.ToTable("Transactions");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TransactionIdKey");
+                        });
+
+                    b.OwnsOne("InvestmentHub.Domain.ValueObjects.Money", "PricePerUnit", b1 =>
+                        {
+                            b1.Property<Guid>("TransactionIdKey")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("PricePerUnit");
+
+                            b1.Property<int>("Currency")
+                                .HasMaxLength(3)
+                                .HasColumnType("integer")
+                                .HasColumnName("Currency");
+
+                            b1.HasKey("TransactionIdKey");
+
+                            b1.ToTable("Transactions");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TransactionIdKey");
+                        });
+
+                    b.OwnsOne("InvestmentHub.Domain.ValueObjects.Symbol", "Symbol", b1 =>
+                        {
+                            b1.Property<Guid>("TransactionIdKey")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("AssetType")
+                                .HasMaxLength(50)
+                                .HasColumnType("integer")
+                                .HasColumnName("AssetType");
+
+                            b1.Property<string>("Exchange")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("character varying(50)")
+                                .HasColumnName("Exchange");
+
+                            b1.Property<string>("Ticker")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("character varying(50)")
+                                .HasColumnName("Symbol");
+
+                            b1.HasKey("TransactionIdKey");
+
+                            b1.ToTable("Transactions");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TransactionIdKey");
+                        });
+
+                    b.OwnsOne("InvestmentHub.Domain.ValueObjects.Money", "TaxWithheld", b1 =>
+                        {
+                            b1.Property<Guid>("TransactionIdKey")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("TaxWithheld");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("TaxWithheldCurrency");
+
+                            b1.HasKey("TransactionIdKey");
+
+                            b1.ToTable("Transactions");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TransactionIdKey");
+                        });
+
+                    b.Navigation("Fee");
+
+                    b.Navigation("GrossAmount");
+
+                    b.Navigation("NetAmount");
+
+                    b.Navigation("PricePerUnit");
+
+                    b.Navigation("Symbol")
+                        .IsRequired();
+
+                    b.Navigation("TaxWithheld");
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.DocumentChunk", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.FinancialReport", "Report")
+                        .WithMany("Chunks")
+                        .HasForeignKey("ReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.EtfDetails", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
+                        .WithOne("EtfDetails")
+                        .HasForeignKey("InvestmentHub.Domain.Entities.EtfDetails", "InstrumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Instrument");
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
+                        .WithMany()
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Instrument");
+                });
+
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Instrument", b =>
                 {
                     b.OwnsOne("InvestmentHub.Domain.ValueObjects.Symbol", "Symbol", b1 =>
@@ -364,8 +893,8 @@ namespace InvestmentHub.Infrastructure.Migrations
 
                             b1.Property<string>("Ticker")
                                 .IsRequired()
-                                .HasMaxLength(10)
-                                .HasColumnType("character varying(10)")
+                                .HasMaxLength(50)
+                                .HasColumnType("character varying(50)")
                                 .HasColumnName("SymbolTicker");
 
                             b1.HasKey("InstrumentId");
@@ -382,6 +911,17 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.InterestPeriod", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.TreasuryBondDetails", "BondDetails")
+                        .WithMany("InterestPeriods")
+                        .HasForeignKey("BondDetailsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BondDetails");
+                });
+
             modelBuilder.Entity("InvestmentHub.Domain.Entities.Investment", b =>
                 {
                     b.HasOne("InvestmentHub.Domain.Entities.Portfolio", null)
@@ -396,13 +936,14 @@ namespace InvestmentHub.Infrastructure.Migrations
                                 .HasColumnType("uuid");
 
                             b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 8)
                                 .HasColumnType("decimal(18,2)")
                                 .HasColumnName("CurrentValueAmount");
 
                             b1.Property<string>("Currency")
                                 .IsRequired()
-                                .HasMaxLength(3)
-                                .HasColumnType("character varying(3)")
+                                .HasMaxLength(10)
+                                .HasColumnType("character varying(10)")
                                 .HasColumnName("CurrentValueCurrency");
 
                             b1.HasKey("InvestmentId");
@@ -419,13 +960,14 @@ namespace InvestmentHub.Infrastructure.Migrations
                                 .HasColumnType("uuid");
 
                             b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 8)
                                 .HasColumnType("decimal(18,2)")
                                 .HasColumnName("PurchasePriceAmount");
 
                             b1.Property<string>("Currency")
                                 .IsRequired()
-                                .HasMaxLength(3)
-                                .HasColumnType("character varying(3)")
+                                .HasMaxLength(10)
+                                .HasColumnType("character varying(10)")
                                 .HasColumnName("PurchasePriceCurrency");
 
                             b1.HasKey("InvestmentId");
@@ -455,8 +997,8 @@ namespace InvestmentHub.Infrastructure.Migrations
 
                             b1.Property<string>("Ticker")
                                 .IsRequired()
-                                .HasMaxLength(10)
-                                .HasColumnType("character varying(10)")
+                                .HasMaxLength(50)
+                                .HasColumnType("character varying(50)")
                                 .HasColumnName("SymbolTicker");
 
                             b1.HasKey("InvestmentId");
@@ -475,6 +1017,17 @@ namespace InvestmentHub.Infrastructure.Migrations
 
                     b.Navigation("Symbol")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.TreasuryBondDetails", b =>
+                {
+                    b.HasOne("InvestmentHub.Domain.Entities.Instrument", "Instrument")
+                        .WithOne("BondDetails")
+                        .HasForeignKey("InvestmentHub.Domain.Entities.TreasuryBondDetails", "InstrumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Instrument");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -526,6 +1079,23 @@ namespace InvestmentHub.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.FinancialReport", b =>
+                {
+                    b.Navigation("Chunks");
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.Instrument", b =>
+                {
+                    b.Navigation("BondDetails");
+
+                    b.Navigation("EtfDetails");
+                });
+
+            modelBuilder.Entity("InvestmentHub.Domain.Entities.TreasuryBondDetails", b =>
+                {
+                    b.Navigation("InterestPeriods");
                 });
 #pragma warning restore 612, 618
         }

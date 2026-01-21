@@ -34,7 +34,7 @@ public class Instrument
     /// <summary>
     /// Private parameterless constructor for EF Core.
     /// </summary>
-    private Instrument() 
+    private Instrument()
     {
         Symbol = null!;
         Name = null!;
@@ -54,4 +54,16 @@ public class Instrument
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Isin = isin ?? throw new ArgumentNullException(nameof(isin));
     }
+
+    /// <summary>
+    /// Gets the Treasury Bond details if this instrument is a Polish Treasury Bond.
+    /// Null for non-bond instruments.
+    /// </summary>
+    public TreasuryBondDetails? BondDetails { get; init; }
+
+    /// <summary>
+    /// Gets the ETF details if this instrument is an ETF.
+    /// Null for non-ETF instruments.
+    /// </summary>
+    public EtfDetails? EtfDetails { get; init; }
 }

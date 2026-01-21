@@ -146,3 +146,6 @@ Connected Services/
 # =========================================
 # End of file
 # =========================================
+
+!.vscode/launch.json
+!.vscode/tasks.json

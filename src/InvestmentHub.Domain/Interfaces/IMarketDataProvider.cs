@@ -1,11 +1,12 @@
 using InvestmentHub.Domain.Entities;
+using InvestmentHub.Domain.ValueObjects;
 
 namespace InvestmentHub.Domain.Interfaces;
 
 public interface IMarketDataProvider
 {
-    Task<MarketPrice?> GetLatestPriceAsync(string symbol, CancellationToken cancellationToken = default);
-    Task<IEnumerable<MarketPrice>> GetHistoricalPricesAsync(string symbol, DateTime from, DateTime to, CancellationToken cancellationToken = default);
+    Task<MarketPrice?> GetLatestPriceAsync(Symbol symbol, CancellationToken cancellationToken = default, List<string>? traceLogs = null);
+    Task<IEnumerable<MarketPrice>> GetHistoricalPricesAsync(Symbol symbol, DateTime from, DateTime to, CancellationToken cancellationToken = default, List<string>? traceLogs = null);
     Task<IEnumerable<SecurityInfo>> SearchSecuritiesAsync(string query, CancellationToken cancellationToken = default);
 }
 

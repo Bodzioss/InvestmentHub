@@ -17,16 +17,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 🎨 Frontend (Blazor WASM) -->
+    <!-- Frontend (Blazor WASM) -->
     <ProjectReference Include="..\..\src\InvestmentHub.Web.Client\InvestmentHub.Web.Client.csproj" />
     
-    <!-- 🌐 API Layer -->
+    <!-- API Layer -->
     <ProjectReference Include="..\..\src\InvestmentHub.API\InvestmentHub.API.csproj" />
     
-    <!-- ⏰ Background Workers -->
+    <!-- Background Workers -->
     <ProjectReference Include="..\..\src\InvestmentHub.Workers\InvestmentHub.Workers.csproj" />
     
-    <!-- 🔧 Service Configuration -->
+    <!-- Service Configuration -->
     <ProjectReference Include="..\InvestmentHub.ServiceDefaults\InvestmentHub.ServiceDefaults.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 

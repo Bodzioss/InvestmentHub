@@ -12,34 +12,31 @@ public sealed class Money : IEquatable<Money>
     /// Gets the monetary amount.
     /// </summary>
     public decimal Amount { get; }
-    
+
     /// <summary>
     /// Gets the currency of the monetary amount.
     /// </summary>
     public Currency Currency { get; }
-    
-        /// <summary>
-        /// Initializes a new instance of the Money class.
-        /// </summary>
-        /// <param name="amount">The monetary amount (must be non-negative)</param>
-        /// <param name="currency">The currency of the amount</param>
-        /// <exception cref="ArgumentException">Thrown when amount is negative</exception>
-        public Money(decimal amount, Currency currency)
-        {
-            if (amount < 0)
-                throw new ArgumentException("Money amount cannot be negative", nameof(amount));
-                
-            Amount = amount;
-            Currency = currency;
-        }
-    
+
+    /// <summary>
+    /// Initializes a new instance of the Money class.
+    /// </summary>
+    /// <param name="amount">The monetary amount (must be non-negative)</param>
+    /// <param name="currency">The currency of the amount</param>
+    /// <exception cref="ArgumentException">Thrown when amount is negative</exception>
+    public Money(decimal amount, Currency currency)
+    {
+        Amount = amount;
+        Currency = currency;
+    }
+
     /// <summary>
     /// Creates a Money instance with zero amount.
     /// </summary>
     /// <param name="currency">The currency for the zero amount</param>
     /// <returns>A Money instance with zero amount</returns>
     public static Money Zero(Currency currency) => new(0, currency);
-    
+
     /// <summary>
     /// Adds two Money instances of the same currency.
     /// </summary>
@@ -50,10 +47,10 @@ public sealed class Money : IEquatable<Money>
     {
         if (Currency != other.Currency)
             throw new InvalidOperationException($"Cannot add money with different currencies: {Currency} and {other.Currency}");
-        
+
         return new Money(Amount + other.Amount, Currency);
     }
-    
+
     /// <summary>
     /// Subtracts another Money instance from this one.
     /// </summary>
@@ -64,10 +61,10 @@ public sealed class Money : IEquatable<Money>
     {
         if (Currency != other.Currency)
             throw new InvalidOperationException($"Cannot subtract money with different currencies: {Currency} and {other.Currency}");
-        
+
         return new Money(Amount - other.Amount, Currency);
     }
-    
+
     /// <summary>
     /// Multiplies the Money amount by a factor.
     /// </summary>
@@ -78,7 +75,7 @@ public sealed class Money : IEquatable<Money>
     {
         if (factor < 0)
             throw new ArgumentException("Multiplication factor cannot be negative", nameof(factor));
-        
+
         return new Money(Amount * factor, Currency);
     }
 
@@ -92,10 +89,10 @@ public sealed class Money : IEquatable<Money>
     {
         if (divisor <= 0)
             throw new ArgumentException("Divisor must be positive", nameof(divisor));
-        
+
         return new Money(Amount / divisor, Currency);
     }
-    
+
     /// <summary>
     /// Determines whether this Money instance equals another Money instance.
     /// </summary>
@@ -105,34 +102,34 @@ public sealed class Money : IEquatable<Money>
     {
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
-        
+
         return Amount == other.Amount && Currency == other.Currency;
     }
-    
+
     /// <summary>
     /// Determines whether this Money instance equals another object.
     /// </summary>
     /// <param name="obj">The object to compare</param>
     /// <returns>True if the object is a Money instance with equal amount and currency</returns>
     public override bool Equals(object? obj) => Equals(obj as Money);
-    
+
     /// <summary>
     /// Gets the hash code for this Money instance.
     /// </summary>
     /// <returns>A hash code based on amount and currency</returns>
     public override int GetHashCode() => HashCode.Combine(Amount, Currency);
-    
+
     /// <summary>
     /// Returns a string representation of this Money instance.
     /// </summary>
     /// <returns>A formatted string showing amount and currency</returns>
     public override string ToString() => $"{Amount:N2} {Currency}";
-    
+
     /// <summary>
     /// Equality operator for Money instances.
     /// </summary>
     public static bool operator ==(Money? left, Money? right) => Equals(left, right);
-    
+
     /// <summary>
     /// Inequality operator for Money instances.
     /// </summary>

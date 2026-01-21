@@ -1,7 +1,8 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Add PostgreSQL database - Aspire will manage containers
+// Add PostgreSQL database with pgvector extension - using special image
 var postgres = builder.AddPostgres("postgres")
+    .WithImage("pgvector/pgvector", "pg17")
     .WithDataVolume();
 
 // Add Redis cache - Aspire will manage containers

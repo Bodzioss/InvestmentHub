@@ -3,22 +3,10 @@ using InvestmentHub.Domain.ValueObjects;
 
 namespace InvestmentHub.Domain.Events;
 
-public class PortfolioDetailsUpdatedEvent : DomainEvent
+public class PortfolioDetailsUpdatedEvent(PortfolioId portfolioId, string newName, string? newDescription, DateTime occurredOn) : DomainEvent(1)
 {
-    public PortfolioId PortfolioId { get; }
-    public string NewName { get; }
-    public string? NewDescription { get; }
-    public DateTime OccurredOn { get; }
-
-    public PortfolioDetailsUpdatedEvent(
-        PortfolioId portfolioId,
-        string newName,
-        string? newDescription,
-        DateTime occurredOn) : base(1)
-    {
-        PortfolioId = portfolioId;
-        NewName = newName;
-        NewDescription = newDescription;
-        OccurredOn = occurredOn;
-    }
+    public PortfolioId PortfolioId { get; } = portfolioId;
+    public string NewName { get; } = newName;
+    public string? NewDescription { get; } = newDescription;
+    public new DateTime OccurredOn { get; } = occurredOn;
 }

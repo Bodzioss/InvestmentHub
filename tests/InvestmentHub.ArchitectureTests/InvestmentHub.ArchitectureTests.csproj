@@ -9,18 +9,22 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="FluentAssertions" Version="8.8.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Xunit" />
+    <ProjectReference Include="..\..\src\InvestmentHub.Domain\InvestmentHub.Domain.csproj" />
+    <ProjectReference Include="..\..\src\InvestmentHub.Application\InvestmentHub.Application.csproj" />
+    <ProjectReference Include="..\..\src\InvestmentHub.Infrastructure\InvestmentHub.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\InvestmentHub.API\InvestmentHub.API.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\InvestmentHub.Domain\InvestmentHub.Domain.csproj" />
+    <Using Include="Xunit" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions; // Add this
 using InvestmentHub.Domain.Entities;
 using InvestmentHub.Domain.Enums;
 using InvestmentHub.Domain.ValueObjects;
@@ -8,10 +9,14 @@ using YahooQuotesApi;
 
 namespace InvestmentHub.Infrastructure.Data;
 
-public class InstrumentImporter
+public partial class InstrumentImporter
 {
     private readonly ApplicationDbContext _context;
     private readonly YahooQuotes _yahooQuotes;
+    private static readonly JsonSerializerOptions IndentedOptions = new() { WriteIndented = true };
+
+    [GeneratedRegex(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")]
+    private static partial System.Text.RegularExpressions.Regex CsvRegex();
 
     public InstrumentImporter(ApplicationDbContext context, YahooQuotes yahooQuotes)
     {
@@ -56,12 +61,12 @@ public class InstrumentImporter
                 var symbol = new Domain.ValueObjects.Symbol(item.ShortName, exchange, assetType);
                 // Ensure ISIN is max 20 chars
                 var safeIsin = item.Isin?.Trim();
-                if (safeIsin != null && safeIsin.Length > 20) safeIsin = safeIsin.Substring(0, 20);
+                if (safeIsin != null && safeIsin.Length > 20) safeIsin = safeIsin[..20];
 
-                var instrument = new Instrument(symbol, item.Name, safeIsin);
+                var instrument = new Instrument(symbol, item.Name, safeIsin ?? string.Empty);
 
                 instruments.Add(instrument);
-                existingIsinSet.Add(item.Isin);
+                if (item.Isin != null) existingIsinSet.Add(item.Isin);
             }
             catch (Exception ex)
             {
@@ -69,7 +74,7 @@ public class InstrumentImporter
             }
         }
 
-        if (instruments.Any())
+        if (instruments.Count > 0)
         {
             await _context.Instruments.AddRangeAsync(instruments);
             await _context.SaveChangesAsync();
@@ -151,8 +156,7 @@ public class InstrumentImporter
 
         // Save valid list
         var result = new RootObject { Rows = validRows };
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        var resultJson = JsonSerializer.Serialize(result, options);
+        var resultJson = JsonSerializer.Serialize(result, IndentedOptions);
         await File.WriteAllTextAsync(outputPath, resultJson);
 
         return validRows.Count;
@@ -197,7 +201,7 @@ public class InstrumentImporter
         var json = await File.ReadAllTextAsync(inputPath);
         var items = JsonSerializer.Deserialize<List<GlobalInstrumentItem>>(json);
 
-        if (items == null || !items.Any()) return 0;
+        if (items == null || items.Count == 0) return 0;
 
         var validRows = new List<GlobalInstrumentItem>();
         var batchSize = 100;
@@ -257,8 +261,7 @@ public class InstrumentImporter
         }
 
         // Save valid list
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        var resultJson = JsonSerializer.Serialize(validRows, options);
+        var resultJson = JsonSerializer.Serialize(validRows, IndentedOptions);
         await File.WriteAllTextAsync(outputPath, resultJson);
 
         return validRows.Count;
@@ -280,7 +283,7 @@ public class InstrumentImporter
         var existingTickers = new HashSet<string>(await _context.Instruments.Select(i => i.Symbol.Ticker).ToListAsync());
 
         // Simple CSV parser for quoted fields
-        var csvRegex = new System.Text.RegularExpressions.Regex(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+        var csvRegex = CsvRegex();
 
         // Find the header row (contains "Ticker" and "ISIN") - handles multi-line headers
         int headerRowIndex = 0;
@@ -326,7 +329,7 @@ public class InstrumentImporter
                 // Parse ISIN (col 3)
                 var isin = parts.Length > 3 ? parts[3].Trim() : "";
                 if (string.IsNullOrEmpty(isin)) continue;
-                if (isin.Length > 20) isin = isin.Substring(0, 20); // Truncate to DB limit
+                if (isin.Length > 20) isin = isin[..20]; // Truncate to DB limit
 
                 // Parse ticker from column 1 (simple ticker like "XMKA")
                 var ticker = parts[1].Trim();
@@ -430,7 +433,7 @@ public class InstrumentImporter
             }
         }
 
-        if (instruments.Any())
+        if (instruments.Count > 0)
         {
             await _context.Instruments.AddRangeAsync(instruments);
             await _context.Set<Domain.Entities.EtfDetails>().AddRangeAsync(etfDetailsList);
@@ -498,7 +501,7 @@ public class InstrumentImporter
 
             // Generate dummy ISIN consistently
             var dummyIsin = $"US{ticker.PadRight(10, 'X')}";
-            if (dummyIsin.Length > 20) dummyIsin = dummyIsin.Substring(0, 20);
+            if (dummyIsin.Length > 20) dummyIsin = dummyIsin[..20];
 
             // Check if Ticker OR ISIN already exists
             if (existingTickers.Contains(ticker) || existingIsins.Contains(dummyIsin))
@@ -531,7 +534,7 @@ public class InstrumentImporter
             }
         }
 
-        if (instruments.Any())
+        if (instruments.Count > 0)
         {
             // Try to save all at once
             try
@@ -578,7 +581,7 @@ public class InstrumentImporter
     private sealed class RootObject
     {
         [JsonPropertyName("r_")]
-        public List<InstrumentItem> Rows { get; set; } = new();
+        public List<InstrumentItem> Rows { get; set; } = [];
     }
 
     private sealed class InstrumentItem
@@ -599,15 +602,15 @@ public class InstrumentImporter
     private sealed class GlobalInstrumentItem
     {
         [JsonPropertyName("NASDAQ Symbol")]
-        public string NasdaqSymbol { get; set; }
+        public string NasdaqSymbol { get; set; } = string.Empty;
 
         [JsonPropertyName("Security Name")]
-        public string SecurityName { get; set; }
+        public string SecurityName { get; set; } = string.Empty;
 
         [JsonPropertyName("ETF")]
-        public string Etf { get; set; }
+        public string Etf { get; set; } = string.Empty;
 
         [JsonPropertyName("Exchange")]
-        public string Exchange { get; set; }
+        public string Exchange { get; set; } = string.Empty;
     }
 } // End of InstrumentImporter class

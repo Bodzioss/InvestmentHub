@@ -28,11 +28,11 @@ export function useInvestments(portfolioId: string) {
 // useInvestment - Get single investment
 // ============================================
 
-export function useInvestment(investmentId: string) {
+export function useInvestment(portfolioId: string, investmentId: string) {
     return useQuery({
         queryKey: [QUERY_KEYS.INVESTMENTS, investmentId],
-        queryFn: () => getInvestment(investmentId),
-        enabled: !!investmentId,
+        queryFn: () => getInvestment(portfolioId, investmentId),
+        enabled: !!portfolioId && !!investmentId,
     })
 }
 
@@ -65,10 +65,11 @@ export function useUpdateInvestment() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: ({ investmentId, request }: {
+        mutationFn: ({ portfolioId, investmentId, request }: {
+            portfolioId: string
             investmentId: string
             request: UpdateInvestmentRequest
-        }) => updateInvestment(investmentId, request),
+        }) => updateInvestment(portfolioId, investmentId, request),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.INVESTMENTS] })
             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.PORTFOLIOS] })
@@ -111,7 +112,8 @@ export function useDeleteInvestment() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (investmentId: string) => deleteInvestment(investmentId),
+        mutationFn: ({ portfolioId, investmentId }: { portfolioId: string, investmentId: string }) =>
+            deleteInvestment(portfolioId, investmentId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.INVESTMENTS] })
             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.PORTFOLIOS] })

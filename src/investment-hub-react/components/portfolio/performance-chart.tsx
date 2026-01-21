@@ -61,7 +61,7 @@ export function PerformanceChart({ portfolio }: PerformanceChartProps) {
                                 stroke="#8884d8"
                                 strokeWidth={2}
                                 name="Portfolio Value"
-                                dot={{ r: 4 }}
+                                dot={false}
                             />
                             <Line
                                 type="monotone"

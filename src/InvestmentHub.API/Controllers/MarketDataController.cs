@@ -13,6 +13,8 @@ namespace InvestmentHub.API.Controllers;
 
 [ApiController]
 [Route("api/market")]
+[ProducesResponseType(typeof(MarketPriceDto), StatusCodes.Status200OK)]
+[ProducesResponseType(StatusCodes.Status404NotFound)]
 public class MarketDataController : ControllerBase
 {
     private readonly MarketPriceService _marketPriceService;
@@ -91,7 +93,7 @@ public class MarketDataController : ControllerBase
     }
 
     [HttpPost("import/{symbol}")]
-    public async Task<IActionResult> ImportHistory(string symbol)
+    public IActionResult ImportHistory(string symbol)
     {
         // Trigger background job logic directly or enqueue it
         // Since HistoricalImportJob is registered as scoped/transient, we can use it directly 

@@ -1,6 +1,7 @@
 using InvestmentHub.Domain.Common;
 using InvestmentHub.Domain.Events;
 using InvestmentHub.Domain.Services;
+using Microsoft.Extensions.Logging;
 
 namespace InvestmentHub.Domain.EventHandlers;
 
@@ -11,17 +12,20 @@ namespace InvestmentHub.Domain.EventHandlers;
 public class InvestmentAddedEventHandler : IDomainEventSubscriber<InvestmentAddedEvent>
 {
     private readonly IPortfolioValuationService _valuationService;
-    
+    private readonly ILogger<InvestmentAddedEventHandler> _logger;
+
     /// <summary>
     /// Initializes a new instance of the InvestmentAddedEventHandler class.
     /// </summary>
     /// <param name="valuationService">The portfolio valuation service</param>
-    /// <exception cref="ArgumentNullException">Thrown when valuationService is null</exception>
-    public InvestmentAddedEventHandler(IPortfolioValuationService valuationService)
+    /// <param name="logger">The logger</param>
+    /// <exception cref="ArgumentNullException">Thrown when dependencies are null</exception>
+    public InvestmentAddedEventHandler(IPortfolioValuationService valuationService, ILogger<InvestmentAddedEventHandler> logger)
     {
         _valuationService = valuationService ?? throw new ArgumentNullException(nameof(valuationService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-    
+
     /// <summary>
     /// Handles the InvestmentAddedEvent by updating portfolio valuation and analytics.
     /// </summary>
@@ -31,41 +35,21 @@ public class InvestmentAddedEventHandler : IDomainEventSubscriber<InvestmentAdde
     {
         if (domainEvent == null)
             throw new ArgumentNullException(nameof(domainEvent));
-            
+
         try
         {
-            // Log the event (in a real application, this would use proper logging)
-            Console.WriteLine($"Handling InvestmentAddedEvent: {domainEvent}");         
-            
+            _logger.LogInformation("Handling InvestmentAddedEvent for Portfolio {PortfolioId}, Ticker {Ticker}",
+                domainEvent.PortfolioId.Value, domainEvent.Symbol.Ticker);
+
             // Update portfolio valuation using the service
             await _valuationService.ProcessEvent(domainEvent);
-            
-            // For now, we'll simulate additional valuation update
-            await SimulateValuationUpdateAsync(domainEvent);
         }
         catch (Exception ex)
         {
-            // In a real application, this would use proper error handling and logging
-            Console.WriteLine($"Error handling InvestmentAddedEvent: {ex.Message}");
+            _logger.LogError(ex, "Error handling InvestmentAddedEvent for Portfolio {PortfolioId}: {Message}",
+                domainEvent.PortfolioId.Value, ex.Message);
             throw;
         }
     }
-    
-    /// <summary>
-    /// Simulates portfolio valuation update after investment addition.
-    /// In a real application, this would interact with repositories and external services.
-    /// </summary>
-    /// <param name="domainEvent">The InvestmentAddedEvent</param>
-    /// <returns>A task representing the asynchronous operation</returns>
-    private static async Task SimulateValuationUpdateAsync(InvestmentAddedEvent domainEvent)
-    {
-        // Simulate async work
-        await Task.Delay(100);
-        
-        // Calculate total cost
-        var totalCost = domainEvent.PurchasePrice.Amount * domainEvent.Quantity;
-        
-        Console.WriteLine($"Portfolio valuation updated for Portfolio {domainEvent.PortfolioId.Value}");
-        Console.WriteLine($"Added investment: {domainEvent.Symbol.Ticker} x{domainEvent.Quantity} worth {totalCost} {domainEvent.PurchasePrice.Currency}");
-    }
+
 }

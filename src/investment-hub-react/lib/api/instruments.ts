@@ -15,12 +15,14 @@ export interface SearchInstrumentsParams {
  * Search instruments by ticker, name, or ISIN
  */
 export async function searchInstruments(params: SearchInstrumentsParams): Promise<Instrument[]> {
-    const response = await apiClient.get<Instrument[]>('/api/instruments', {
+    const response = await apiClient.get<any>('/api/instruments', {
         params: {
-            query: params.query || undefined,
-            assetType: params.assetType || undefined,
+            search: params.query || undefined,
+            type: params.assetType || undefined,
             exchange: params.exchange || undefined,
         },
     })
-    return response.data
+
+    // Backend returns paginated response { instruments: [...], totalCount: ... }
+    return response.data.instruments || response.data.Instruments || []
 }

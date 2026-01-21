@@ -145,7 +145,7 @@ export function AddInvestmentDialog({ portfolioId, children }: AddInvestmentDial
         setSelectedInstrument(instrument)
         form.setValue('ticker', instrument.ticker)
         form.setValue('exchange', instrument.exchange)
-        form.setValue('assetType', instrument.assetType)
+        form.setValue('assetType', instrument.assetType as any)
         setInstrumentPopoverOpen(false)
     }
 

@@ -49,6 +49,7 @@ export function EditPortfolioDialog({ portfolio, open, onOpenChange }: EditPortf
         }
 
         mutation.mutate({
+            portfolioId: portfolio.id,
             name: name.trim(),
             description: description.trim() || undefined,
         })

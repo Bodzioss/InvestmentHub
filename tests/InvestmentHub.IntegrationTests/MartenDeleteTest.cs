@@ -5,7 +5,7 @@ using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace InvestmentHub.Domain.Tests.Integration;
+namespace InvestmentHub.IntegrationTests;
 
 public class MartenDeleteTest : IClassFixture<MartenFixture>
 {
@@ -23,7 +23,7 @@ public class MartenDeleteTest : IClassFixture<MartenFixture>
         await using var session = _fixture.Store?.LightweightSession();
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
-        
+
         // Create
         var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Delete Test Portfolio", "Description");
         session!.Events.StartStream<PortfolioAggregate>(portfolioId.Value, aggregate.GetUncommittedEvents().ToArray());
@@ -41,7 +41,7 @@ public class MartenDeleteTest : IClassFixture<MartenFixture>
         var closeEvent = loadedAggregate.Close("Deleted test", ownerId);
         session.Events.Append(portfolioId.Value, closeEvent);
         await session.SaveChangesAsync();
-        
+
         // Assert - Verify Closed
         var reloadedAggregate = await session.Events.AggregateStreamAsync<PortfolioAggregate>(portfolioId.Value);
         reloadedAggregate!.IsClosed.Should().BeTrue();

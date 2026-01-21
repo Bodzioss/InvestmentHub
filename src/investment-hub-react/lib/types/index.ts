@@ -24,6 +24,7 @@ export interface CreatePortfolioRequest {
 }
 
 export interface UpdatePortfolioRequest {
+    portfolioId: string
     name: string
     description?: string
 }

@@ -45,7 +45,7 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         activity?.SetTag("mediatr.request.type", requestType);
         activity?.SetTag("mediatr.request.name", requestName);
         activity?.SetTag("mediatr.request.full_name", typeof(TRequest).FullName ?? requestName);
-        
+
         // Add Correlation ID to activity if available from parent Activity
         // Correlation ID is set in CorrelationIdMiddleware and propagated automatically
         var correlationId = GetCorrelationIdFromActivity();
@@ -54,23 +54,31 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
             activity?.SetTag("correlation.id", correlationId);
         }
 
-        _logger.LogInformation(
-            "Starting {RequestType} {RequestName} with {@Request}",
-            requestType,
-            requestName,
-            request);
+        // _logger.LogInformation("Starting {RequestType} {RequestName}...", ...); // Removed to reduce noise
 
         try
         {
             var response = await next();
-            
+
             activity?.SetStatus(ActivityStatusCode.Ok);
-            
-            _logger.LogInformation(
-                "Completed {RequestType} {RequestName} with {@Response}",
-                requestType,
-                requestName,
-                response);
+
+            // Only log completion at Information level for Commands (state changes)
+            // Queries are logged at Debug level to avoid flooding logs (e.g. polling)
+            if (requestType == "Command")
+            {
+                _logger.LogInformation(
+                    "Completed {RequestType} {RequestName} with {@Response}",
+                    requestType,
+                    requestName,
+                    response);
+            }
+            else
+            {
+                _logger.LogDebug(
+                    "Completed {RequestType} {RequestName}",
+                    requestType,
+                    requestName);
+            }
 
             return response;
         }
@@ -78,7 +86,7 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         {
             activity?.SetStatus(ActivityStatusCode.Ok); // Cancellation is not an error
             activity?.SetTag("cancelled", true);
-            
+
 #pragma warning disable S6667 // Logging in a catch clause should pass the caught exception as a parameter
             _logger.LogInformation("{RequestType} {RequestName} was cancelled", requestType, requestName);
 #pragma warning restore S6667 // Logging in a catch clause should pass the caught exception as a parameter
@@ -90,7 +98,7 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
             activity?.SetTag("error", true);
             activity?.SetTag("error.message", ex.Message);
             activity?.SetTag("error.type", ex.GetType().Name);
-            
+
             throw;
         }
     }
@@ -126,11 +134,11 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
             {
                 return correlationId;
             }
-            
+
             // Move to parent activity
             activity = activity.Parent;
         }
-        
+
         return null;
     }
 }

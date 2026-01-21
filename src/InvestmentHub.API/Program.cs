@@ -357,6 +357,9 @@ app.UseCors("AllowAll");
 // This ensures Correlation ID is available in all subsequent logs
 app.UseMiddleware<CorrelationIdMiddleware>();
 
+// Add Request Timing Middleware to expose backend latency via Server-Timing header
+app.UseMiddleware<RequestTimingMiddleware>();
+
 app.MapHealthChecksUI(options =>
 {
     options.UIPath = "/healthchecks-ui";

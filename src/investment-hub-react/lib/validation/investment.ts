@@ -12,9 +12,7 @@ export const addInvestmentSchema = z.object({
         .transform(val => val.toUpperCase()),
     exchange: z
         .string()
-        .max(20, 'Exchange must be less than 20 characters')
-        .optional()
-        .default('NASDAQ'),  // Default exchange - optional for bonds
+        .max(20, 'Exchange must be less than 20 characters'),
     assetType: z.enum(['Stock', 'Bond', 'ETF', 'Commodity', 'Cryptocurrency', 'Other']),
     quantity: z
         .number()

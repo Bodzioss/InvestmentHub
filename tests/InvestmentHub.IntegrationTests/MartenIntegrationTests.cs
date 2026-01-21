@@ -16,7 +16,7 @@ using Moq;
 using Testcontainers.PostgreSql;
 using Xunit;
 
-namespace InvestmentHub.Domain.Tests.Integration;
+namespace InvestmentHub.IntegrationTests;
 
 /// <summary>
 /// Integration tests for Marten Event Sourcing with real PostgreSQL database.
@@ -33,6 +33,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     /// </summary>
     public async Task InitializeAsync()
     {
+        // Create and start PostgreSQL container
         // Create and start PostgreSQL container
         _postgresContainer = new PostgreSqlBuilder()
             .WithImage("postgres:16-alpine")
@@ -51,11 +52,11 @@ public class MartenIntegrationTests : IAsyncLifetime
         {
             options.Connection(_connectionString);
             options.Events.StreamIdentity = StreamIdentity.AsGuid;
-            
+
             // Register projections
             options.Projections.Add<PortfolioProjection>(Marten.Events.Projections.ProjectionLifecycle.Inline);
             options.Projections.Add<InvestmentProjection>(Marten.Events.Projections.ProjectionLifecycle.Inline);
-            
+
             // Auto-create schema
             options.AutoCreateSchemaObjects = Weasel.Core.AutoCreate.All;
         });
@@ -70,7 +71,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         _documentStore?.Dispose();
-        
+
         if (_postgresContainer != null)
         {
             await _postgresContainer.DisposeAsync();
@@ -82,7 +83,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await using var session = _documentStore!.LightweightSession();
-        
+
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
         var name = "Test Portfolio";
@@ -90,20 +91,20 @@ public class MartenIntegrationTests : IAsyncLifetime
 
         // Act - Create aggregate and save events
         var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, name, description);
-        
+
         session.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
             aggregate.GetUncommittedEvents().ToArray());
-        
+
         await session.SaveChangesAsync();
 
         // Assert - Verify events are in event stream
         var events = await session.Events.FetchStreamAsync(portfolioId.Value);
-        
+
         events.Should().NotBeNull();
         events.Should().HaveCount(1);
         events[0].Data.Should().BeOfType<PortfolioCreatedEvent>();
-        
+
         var createdEvent = (PortfolioCreatedEvent)events[0].Data;
         createdEvent.PortfolioId.Should().Be(portfolioId);
         createdEvent.OwnerId.Should().Be(ownerId);
@@ -116,7 +117,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await using var session = _documentStore!.LightweightSession();
-        
+
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
         var name = "Read Model Test Portfolio";
@@ -124,16 +125,16 @@ public class MartenIntegrationTests : IAsyncLifetime
 
         // Act - Create portfolio via event stream
         var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, name, description);
-        
+
         session.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
             aggregate.GetUncommittedEvents().ToArray());
-        
+
         await session.SaveChangesAsync();
 
         // Assert - Verify read model was built by projection
         var readModel = await session.LoadAsync<PortfolioReadModel>(portfolioId.Value);
-        
+
         readModel.Should().NotBeNull();
         readModel!.Id.Should().Be(portfolioId.Value);
     }
@@ -143,7 +144,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange - Setup command handler with real Marten session
         await using var session = _documentStore!.LightweightSession();
-        
+
         var userRepositoryMock = new Mock<IUserRepository>();
         var portfolioRepositoryMock = new Mock<IPortfolioRepository>();
         var loggerMock = new Mock<ILogger<CreatePortfolioCommandHandler>>();
@@ -154,15 +155,15 @@ public class MartenIntegrationTests : IAsyncLifetime
         userRepositoryMock
             .Setup(x => x.GetByIdAsync(It.IsAny<UserId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InvestmentHub.Domain.Entities.User(
-                UserId.New(), 
-                "Test User", 
-                "test@test.com", 
+                UserId.New(),
+                "Test User",
+                "test@test.com",
                 DateTime.UtcNow));
-        
+
         userRepositoryMock
             .Setup(x => x.CanCreatePortfolioAsync(It.IsAny<UserId>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
-        
+
         portfolioRepositoryMock
             .Setup(x => x.ExistsByNameAsync(It.IsAny<UserId>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
@@ -209,22 +210,22 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange - Create initial portfolio
         await using var session = _documentStore!.LightweightSession();
-        
+
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
         var initialName = "Original Name";
-        
+
         var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, initialName, "Description");
-        
+
         session.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
             aggregate.GetUncommittedEvents().ToArray());
-        
+
         await session.SaveChangesAsync();
 
         // Act - Rename portfolio
         await using var session2 = _documentStore!.LightweightSession();
-        
+
         // Manually reconstitute aggregate from events
         var streamEvents = await session2.Events.FetchStreamAsync(portfolioId.Value);
         var loadedAggregate = new PortfolioAggregate();
@@ -233,10 +234,10 @@ public class MartenIntegrationTests : IAsyncLifetime
             ((dynamic)loadedAggregate).Apply((dynamic)evt.Data);
         }
         loadedAggregate.ClearUncommittedEvents(); // Clear creation events
-        
+
         var newName = "Renamed Portfolio";
         loadedAggregate.Rename(newName);
-        
+
         session2.Events.Append(portfolioId.Value, loadedAggregate.GetUncommittedEvents().ToArray());
         await session2.SaveChangesAsync();
 
@@ -245,7 +246,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         events.Should().HaveCount(2);
         events[0].Data.Should().BeOfType<PortfolioCreatedEvent>();
         events[1].Data.Should().BeOfType<PortfolioRenamedEvent>();
-        
+
         var renamedEvent = (PortfolioRenamedEvent)events[1].Data;
         renamedEvent.OldName.Should().Be(initialName);
         renamedEvent.NewName.Should().Be(newName);
@@ -263,21 +264,21 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange - Create initial portfolio
         await using var session = _documentStore!.LightweightSession();
-        
+
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
-        
+
         var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Test Portfolio", "Description");
-        
+
         session.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
             aggregate.GetUncommittedEvents().ToArray());
-        
+
         await session.SaveChangesAsync();
 
         // Act - Close portfolio
         await using var session2 = _documentStore!.LightweightSession();
-        
+
         // Manually reconstitute aggregate from events
         var streamEvents = await session2.Events.FetchStreamAsync(portfolioId.Value);
         var loadedAggregate = new PortfolioAggregate();
@@ -286,11 +287,11 @@ public class MartenIntegrationTests : IAsyncLifetime
             ((dynamic)loadedAggregate).Apply((dynamic)evt.Data);
         }
         loadedAggregate.ClearUncommittedEvents(); // Clear creation events
-        
+
         var closedBy = UserId.New();
         var closeReason = "Testing closure";
         loadedAggregate.Close(closeReason, closedBy);
-        
+
         session2.Events.Append(portfolioId.Value, loadedAggregate.GetUncommittedEvents().ToArray());
         await session2.SaveChangesAsync();
 
@@ -298,7 +299,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         var events = await session2.Events.FetchStreamAsync(portfolioId.Value);
         events.Should().HaveCount(2);
         events[1].Data.Should().BeOfType<PortfolioClosedEvent>();
-        
+
         var closedEvent = (PortfolioClosedEvent)events[1].Data;
         closedEvent.Reason.Should().Be(closeReason);
         closedEvent.ClosedBy.Should().Be(closedBy);
@@ -316,10 +317,10 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange & Act - Full lifecycle: Create -> Rename -> Rename again -> Close
         await using var session = _documentStore!.LightweightSession();
-        
+
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
-        
+
         // Create
         var aggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Initial Name", "Description");
         session.Events.StartStream<PortfolioAggregate>(portfolioId.Value, aggregate.GetUncommittedEvents().ToArray());
@@ -358,7 +359,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         // Assert - Verify all events
         await using var sessionFinal = _documentStore!.LightweightSession();
         var events = await sessionFinal.Events.FetchStreamAsync(portfolioId.Value);
-        
+
         events.Should().HaveCount(4);
         events[0].Data.Should().BeOfType<PortfolioCreatedEvent>();
         events[1].Data.Should().BeOfType<PortfolioRenamedEvent>();
@@ -379,7 +380,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await using var session = _documentStore!.LightweightSession();
-        
+
         var investmentId = InvestmentId.New();
         var portfolioId = PortfolioId.New();
         var symbol = new Symbol("AAPL", "NASDAQ", InvestmentHub.Domain.Enums.AssetType.Stock);
@@ -395,20 +396,20 @@ public class MartenIntegrationTests : IAsyncLifetime
             purchasePrice,
             quantity,
             purchaseDate);
-        
+
         session.Events.StartStream<InvestmentAggregate>(
             investmentId.Value,
             aggregate.GetUncommittedEvents().ToArray());
-        
+
         await session.SaveChangesAsync();
 
         // Assert - Verify events are in event stream
         var events = await session.Events.FetchStreamAsync(investmentId.Value);
-        
+
         events.Should().NotBeEmpty();
         events.Should().HaveCount(1);
         events[0].Data.Should().BeOfType<InvestmentAddedEvent>();
-        
+
         var addedEvent = (InvestmentAddedEvent)events[0].Data;
         addedEvent.InvestmentId.Should().Be(investmentId);
         addedEvent.PortfolioId.Should().Be(portfolioId);
@@ -422,7 +423,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await using var session = _documentStore!.LightweightSession();
-        
+
         var investmentId = InvestmentId.New();
         var portfolioId = PortfolioId.New();
         var symbol = new Symbol("TSLA", "NASDAQ", InvestmentHub.Domain.Enums.AssetType.Stock);
@@ -438,17 +439,17 @@ public class MartenIntegrationTests : IAsyncLifetime
             purchasePrice,
             quantity,
             purchaseDate);
-        
+
         session.Events.StartStream<InvestmentAggregate>(
             investmentId.Value,
             aggregate.GetUncommittedEvents().ToArray());
-        
+
         await session.SaveChangesAsync();
 
         // Assert - Verify projection created read model
         await using var session2 = _documentStore!.LightweightSession();
         var readModel = await session2.LoadAsync<InvestmentReadModel>(investmentId.Value);
-        
+
         readModel.Should().NotBeNull();
         readModel!.Id.Should().Be(investmentId.Value);
         readModel.PortfolioId.Should().Be(portfolioId.Value);
@@ -469,7 +470,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
         var portfolioAggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Test Portfolio");
-        
+
         portfolioSession.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
             portfolioAggregate.GetUncommittedEvents().ToArray());
@@ -477,7 +478,7 @@ public class MartenIntegrationTests : IAsyncLifetime
 
         // Act - Add Investment via aggregate
         await using var investmentSession = _documentStore!.LightweightSession();
-        
+
         var investmentId = InvestmentId.New();
         var symbol = new Symbol("NVDA", "NASDAQ", InvestmentHub.Domain.Enums.AssetType.Stock);
         var purchasePrice = new Money(450m, InvestmentHub.Domain.Enums.Currency.USD);
@@ -491,17 +492,17 @@ public class MartenIntegrationTests : IAsyncLifetime
             purchasePrice,
             quantity,
             purchaseDate);
-        
+
         investmentSession.Events.StartStream<InvestmentAggregate>(
             investmentId.Value,
             investmentAggregate.GetUncommittedEvents().ToArray());
-        
+
         await investmentSession.SaveChangesAsync();
 
         // Assert - Query returns correct data
         await using var querySession = _documentStore!.LightweightSession();
         var readModel = await querySession.LoadAsync<InvestmentReadModel>(investmentId.Value);
-        
+
         readModel.Should().NotBeNull();
         readModel!.Ticker.Should().Be("NVDA");
         readModel.Quantity.Should().Be(20m);
@@ -516,7 +517,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange - Create investment first
         await using var session = _documentStore!.LightweightSession();
-        
+
         var investmentId = InvestmentId.New();
         var portfolioId = PortfolioId.New();
         var symbol = new Symbol("MSFT", "NASDAQ", InvestmentHub.Domain.Enums.AssetType.Stock);
@@ -531,37 +532,37 @@ public class MartenIntegrationTests : IAsyncLifetime
             purchasePrice,
             quantity,
             purchaseDate);
-        
+
         session.Events.StartStream<InvestmentAggregate>(
             investmentId.Value,
             aggregate.GetUncommittedEvents().ToArray());
-        
+
         await session.SaveChangesAsync();
 
         // Act - Update value
         await using var updateSession = _documentStore!.LightweightSession();
-        
+
         var loadEvents = await updateSession.Events.FetchStreamAsync(investmentId.Value);
         var loadedAggregate = new InvestmentAggregate();
         foreach (var evt in loadEvents) { ((dynamic)loadedAggregate).Apply((dynamic)evt.Data); }
         loadedAggregate.ClearUncommittedEvents();
-        
+
         loadedAggregate.UpdateValue(new Money(350m, InvestmentHub.Domain.Enums.Currency.USD));
-        
+
         updateSession.Events.Append(
             investmentId.Value,
             loadedAggregate.GetUncommittedEvents().ToArray());
-        
+
         await updateSession.SaveChangesAsync();
 
         // Assert - Verify new event appended
         await using var assertSession = _documentStore!.LightweightSession();
         var events = await assertSession.Events.FetchStreamAsync(investmentId.Value);
-        
+
         events.Should().HaveCount(2);
         events[0].Data.Should().BeOfType<InvestmentAddedEvent>();
         events[1].Data.Should().BeOfType<InvestmentValueUpdatedEvent>();
-        
+
         var valueUpdatedEvent = (InvestmentValueUpdatedEvent)events[1].Data;
         valueUpdatedEvent.NewValue.Amount.Should().Be(3500m); // 350 * 10
 
@@ -577,7 +578,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         // Arrange - Create investment first
         await using var session = _documentStore!.LightweightSession();
-        
+
         var investmentId = InvestmentId.New();
         var portfolioId = PortfolioId.New();
         var symbol = new Symbol("GOOGL", "NASDAQ", InvestmentHub.Domain.Enums.AssetType.Stock);
@@ -592,39 +593,39 @@ public class MartenIntegrationTests : IAsyncLifetime
             purchasePrice,
             quantity,
             purchaseDate);
-        
+
         session.Events.StartStream<InvestmentAggregate>(
             investmentId.Value,
             aggregate.GetUncommittedEvents().ToArray());
-        
+
         await session.SaveChangesAsync();
 
         // Act - Sell investment completely
         await using var sellSession = _documentStore!.LightweightSession();
-        
+
         var loadEvents = await sellSession.Events.FetchStreamAsync(investmentId.Value);
         var loadedAggregate = new InvestmentAggregate();
         foreach (var evt in loadEvents) { ((dynamic)loadedAggregate).Apply((dynamic)evt.Data); }
         loadedAggregate.ClearUncommittedEvents();
-        
+
         loadedAggregate.Sell(
             new Money(150m, InvestmentHub.Domain.Enums.Currency.USD),
             null, // Sell all
             DateTime.UtcNow);
-        
+
         sellSession.Events.Append(
             investmentId.Value,
             loadedAggregate.GetUncommittedEvents().ToArray());
-        
+
         await sellSession.SaveChangesAsync();
 
         // Assert - Verify sold event appended
         await using var assertSession = _documentStore!.LightweightSession();
         var events = await assertSession.Events.FetchStreamAsync(investmentId.Value);
-        
+
         events.Should().HaveCount(2);
         events[1].Data.Should().BeOfType<InvestmentSoldEvent>();
-        
+
         var soldEvent = (InvestmentSoldEvent)events[1].Data;
         soldEvent.QuantitySold.Should().Be(8m);
         soldEvent.IsCompleteSale.Should().BeTrue();
@@ -639,7 +640,7 @@ public class MartenIntegrationTests : IAsyncLifetime
         var portfolioId = PortfolioId.New();
         var ownerId = UserId.New();
         var portfolioAggregate = PortfolioAggregate.Initiate(portfolioId, ownerId, "Integration Portfolio");
-        
+
         portfolioSession.Events.StartStream<PortfolioAggregate>(
             portfolioId.Value,
             portfolioAggregate.GetUncommittedEvents().ToArray());
@@ -647,7 +648,7 @@ public class MartenIntegrationTests : IAsyncLifetime
 
         // Act 1 - Add first investment
         await using var addInvestment1Session = _documentStore!.LightweightSession();
-        
+
         var investment1Id = InvestmentId.New();
         var symbol1 = new Symbol("AMZN", "NASDAQ", InvestmentHub.Domain.Enums.AssetType.Stock);
         var purchasePrice1 = new Money(150m, InvestmentHub.Domain.Enums.Currency.USD);
@@ -660,11 +661,11 @@ public class MartenIntegrationTests : IAsyncLifetime
             purchasePrice1,
             quantity1,
             DateTime.UtcNow);
-        
+
         addInvestment1Session.Events.StartStream<InvestmentAggregate>(
             investment1Id.Value,
             investment1Aggregate.GetUncommittedEvents().ToArray());
-        
+
         await addInvestment1Session.SaveChangesAsync();
 
         // Assert after first investment
@@ -676,7 +677,7 @@ public class MartenIntegrationTests : IAsyncLifetime
 
         // Act 2 - Add second investment
         await using var addInvestment2Session = _documentStore!.LightweightSession();
-        
+
         var investment2Id = InvestmentId.New();
         var symbol2 = new Symbol("META", "NASDAQ", InvestmentHub.Domain.Enums.AssetType.Stock);
         var purchasePrice2 = new Money(200m, InvestmentHub.Domain.Enums.Currency.USD);
@@ -689,11 +690,11 @@ public class MartenIntegrationTests : IAsyncLifetime
             purchasePrice2,
             quantity2,
             DateTime.UtcNow);
-        
+
         addInvestment2Session.Events.StartStream<InvestmentAggregate>(
             investment2Id.Value,
             investment2Aggregate.GetUncommittedEvents().ToArray());
-        
+
         await addInvestment2Session.SaveChangesAsync();
 
         // Assert after second investment
@@ -705,18 +706,18 @@ public class MartenIntegrationTests : IAsyncLifetime
 
         // Act 3 - Update value of first investment
         await using var updateSession = _documentStore!.LightweightSession();
-        
+
         var events1 = await updateSession.Events.FetchStreamAsync(investment1Id.Value);
         var loadedInvestment1 = new InvestmentAggregate();
         foreach (var evt in events1) { ((dynamic)loadedInvestment1).Apply((dynamic)evt.Data); }
         loadedInvestment1.ClearUncommittedEvents();
-        
+
         loadedInvestment1.UpdateValue(new Money(200m, InvestmentHub.Domain.Enums.Currency.USD)); // +50 per unit
-        
+
         updateSession.Events.Append(
             investment1Id.Value,
             loadedInvestment1.GetUncommittedEvents().ToArray());
-        
+
         await updateSession.SaveChangesAsync();
 
         // Assert after value update
@@ -727,22 +728,22 @@ public class MartenIntegrationTests : IAsyncLifetime
 
         // Act 4 - Sell first investment completely at market price
         await using var sellSession = _documentStore!.LightweightSession();
-        
+
         var events1ForSale = await sellSession.Events.FetchStreamAsync(investment1Id.Value);
         var loadedInvestment1ForSale = new InvestmentAggregate();
         foreach (var evt in events1ForSale) { ((dynamic)loadedInvestment1ForSale).Apply((dynamic)evt.Data); }
         loadedInvestment1ForSale.ClearUncommittedEvents();
-        
+
         // Sell at same price as current value (200 per unit)
         loadedInvestment1ForSale.Sell(
             new Money(200m, InvestmentHub.Domain.Enums.Currency.USD),
             null, // Sell all
             DateTime.UtcNow);
-        
+
         sellSession.Events.Append(
             investment1Id.Value,
             loadedInvestment1ForSale.GetUncommittedEvents().ToArray());
-        
+
         await sellSession.SaveChangesAsync();
 
         // Assert after sale - TotalProceeds = CurrentValue before sale, so calculation is exact

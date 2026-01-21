@@ -10,31 +10,24 @@ using NodaTime;
 
 namespace InvestmentHub.Infrastructure.MarketData;
 
-public class YahooMarketDataProvider : IMarketDataProvider
+public class YahooMarketDataProvider(
+    IDistributedCache cache,
+    ILogger<YahooMarketDataProvider> logger,
+    ResiliencePipelineProvider<string> pipelineProvider,
+    YahooQuotes yahooQuotes)
+    : IMarketDataProvider
 {
-    private readonly IDistributedCache _cache;
-    private readonly ILogger<YahooMarketDataProvider> _logger;
-    private readonly ResiliencePipeline _pipeline;
-    private readonly YahooQuotes _yahooQuotes;
-
-    public YahooMarketDataProvider(
-        IDistributedCache cache,
-        ILogger<YahooMarketDataProvider> logger,
-        ResiliencePipelineProvider<string> pipelineProvider,
-        YahooQuotes yahooQuotes)
-    {
-        _cache = cache;
-        _logger = logger;
-        _yahooQuotes = yahooQuotes;
-        _pipeline = pipelineProvider.GetPipeline("default");
-    }
+    private readonly IDistributedCache _cache = cache;
+    private readonly ILogger<YahooMarketDataProvider> _logger = logger;
+    private readonly ResiliencePipeline _pipeline = pipelineProvider.GetPipeline("default");
+    private readonly YahooQuotes _yahooQuotes = yahooQuotes;
 
     public async Task<MarketPrice?> GetLatestPriceAsync(Domain.ValueObjects.Symbol symbol, CancellationToken cancellationToken = default, List<string>? traceLogs = null)
     {
         var ticker = symbol.Ticker;
         if ((symbol.Exchange == "GPW" || symbol.Exchange == "WSE" || symbol.Exchange == "WAR" || symbol.Exchange == "NewConnect" || symbol.Exchange == "Catalyst") &&
             !ticker.EndsWith(".WA") &&
-            !ticker.Contains("."))
+            !ticker.Contains('.'))
         {
             ticker += ".WA";
             traceLogs?.Add($"Yahoo: Polish exchange detected ({symbol.Exchange}), added .WA suffix -> {ticker}");
@@ -57,9 +50,8 @@ public class YahooMarketDataProvider : IMarketDataProvider
 
             if (security == null)
             {
-                var msg = $"Symbol {ticker} ({symbol.Exchange}) - Bond not found in Yahoo Finance";
-                _logger.LogWarning(msg);
-                traceLogs?.Add($"Yahoo ERROR: {msg}");
+                _logger.LogWarning("Symbol {Ticker} ({Exchange}) - Bond not found in Yahoo Finance", ticker, symbol.Exchange);
+                traceLogs?.Add($"Yahoo ERROR: Symbol {ticker} ({symbol.Exchange}) - Bond not found in Yahoo Finance");
                 return null;
             }
 
@@ -110,7 +102,7 @@ public class YahooMarketDataProvider : IMarketDataProvider
             if (result.HasError)
             {
                 _logger.LogWarning("YahooQuotesApi error for {Symbol}: {Error}", symbol, result.Error);
-                return Enumerable.Empty<MarketPrice>();
+                return [];
             }
 
             var history = result.Value;
@@ -134,12 +126,12 @@ public class YahooMarketDataProvider : IMarketDataProvider
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching history for {Symbol} from Yahoo Finance via YahooQuotesApi", symbol.Ticker);
-            return Enumerable.Empty<MarketPrice>();
+            return [];
         }
     }
 
-    public async Task<IEnumerable<SecurityInfo>> SearchSecuritiesAsync(string query, CancellationToken cancellationToken = default)
+    public Task<IEnumerable<SecurityInfo>> SearchSecuritiesAsync(string query, CancellationToken cancellationToken = default)
     {
-        return await Task.FromResult(Enumerable.Empty<SecurityInfo>());
+        return Task.FromResult(Enumerable.Empty<SecurityInfo>());
     }
 }

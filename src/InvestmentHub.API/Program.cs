@@ -318,10 +318,28 @@ else
 // Ensure database is created and seeded
 using (var scope = app.Services.CreateScope())
 {
-    // Apply pending migrations first
+    // Apply pending migrations first (only if needed)
     var dbContext = scope.ServiceProvider.GetRequiredService<InvestmentHub.Infrastructure.Data.ApplicationDbContext>();
-    await dbContext.Database.MigrateAsync();
-    logger.LogInformation("Database migrations applied successfully");
+    
+    try
+    {
+        var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
+        if (pendingMigrations.Any())
+        {
+            logger.LogInformation("Applying {Count} pending migrations...", pendingMigrations.Count());
+            await dbContext.Database.MigrateAsync();
+            logger.LogInformation("Database migrations applied successfully");
+        }
+        else
+        {
+            logger.LogInformation("No pending migrations to apply");
+        }
+    }
+    catch (Exception ex) when (ex.InnerException?.Message.Contains("already exists") == true)
+    {
+        logger.LogWarning("Migration skipped - tables already exist: {Message}", ex.Message);
+        // Ensure EnsureCreated is not called if tables exist - just continue
+    }
 
     // Use ServiceProvider to allow Seeder to create background scopes
     var yahooQuotes = scope.ServiceProvider.GetRequiredService<YahooQuotesApi.YahooQuotes>();

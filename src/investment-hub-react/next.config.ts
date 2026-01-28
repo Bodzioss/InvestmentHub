@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // output: 'export', // Removed to enable Hybrid mode for dynamic routes
-  // Optional: Disable image optimization if not using a Node server, 
-  // as it requires 'next start' or a custom loader.
+  output: 'standalone', // For Azure SWA hybrid rendering
   images: {
     unoptimized: true,
   },

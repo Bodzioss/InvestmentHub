@@ -27,12 +27,14 @@ jobs:
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          # Zmieniamy na nową, prostą nazwę sekretu
           azure_static_web_apps_api_token: ${{ secrets.MY_SWA_TOKEN }}
           action: "upload"
           app_location: "./src/investment-hub-react" 
           api_location: ""
           output_location: ""
+        env:
+          NEXT_PUBLIC_API_URL: "https://investmenthub-api.lemonisland-783b8388.northeurope.azurecontainerapps.io"
+          NEXT_PUBLIC_SIGNALR_URL: "https://investmenthub-api.lemonisland-783b8388.northeurope.azurecontainerapps.io/hubs/notifications"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

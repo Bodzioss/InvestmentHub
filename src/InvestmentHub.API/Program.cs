@@ -321,6 +321,9 @@ using (var scope = app.Services.CreateScope())
     // Apply pending migrations first (only if needed)
     var dbContext = scope.ServiceProvider.GetRequiredService<InvestmentHub.Infrastructure.Data.ApplicationDbContext>();
     
+    // Apply pending migrations with robust handling
+    // We removed the unconditional EnsureDeletedAsync.
+    // We now try to migrate, and if it fails because tables exist (42P07), we assume the DB is fine.
     try
     {
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
@@ -337,15 +340,10 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P07")
     {
-        // 42P07: relation "xxx" already exists
-        // This happens when database was initialized by other means (e.g. EnsureCreated)
-        // or concurrent pods tried to migrate at the same time.
-        // We can safely ignore this and assume the schema is correct.
         logger.LogWarning("Migration skipped gracefully - specific table already exists (SqlState: 42P07). Message: {Message}", ex.Message);
     }
     catch (Exception ex)
     {
-        // Check inner exception for PostgresException if wrapped
         if (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "42P07")
         {
              logger.LogWarning("Migration skipped gracefully - specific table already exists (SqlState: 42P07). Message: {Message}", pgEx.Message);
@@ -353,7 +351,8 @@ using (var scope = app.Services.CreateScope())
         else
         {
             logger.LogError(ex, "An error occurred while migrating the database");
-            // Re-throw to fail startup if migration fails legitimately
+            // Check if it's the "database does not exist" error (08P01/3D000) and rethrow, 
+            // but normally MigrateAsync handles creation.
             throw;
         }
     }

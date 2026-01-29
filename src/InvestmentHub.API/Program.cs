@@ -335,10 +335,27 @@ using (var scope = app.Services.CreateScope())
             logger.LogInformation("No pending migrations to apply");
         }
     }
-    catch (Exception ex) when (ex.InnerException?.Message.Contains("already exists") == true)
+    catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P07")
     {
-        logger.LogWarning("Migration skipped - tables already exist: {Message}", ex.Message);
-        // Ensure EnsureCreated is not called if tables exist - just continue
+        // 42P07: relation "xxx" already exists
+        // This happens when database was initialized by other means (e.g. EnsureCreated)
+        // or concurrent pods tried to migrate at the same time.
+        // We can safely ignore this and assume the schema is correct.
+        logger.LogWarning("Migration skipped gracefully - specific table already exists (SqlState: 42P07). Message: {Message}", ex.Message);
+    }
+    catch (Exception ex)
+    {
+        // Check inner exception for PostgresException if wrapped
+        if (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "42P07")
+        {
+             logger.LogWarning("Migration skipped gracefully - specific table already exists (SqlState: 42P07). Message: {Message}", pgEx.Message);
+        }
+        else
+        {
+            logger.LogError(ex, "An error occurred while migrating the database");
+            // Re-throw to fail startup if migration fails legitimately
+            throw;
+        }
     }
 
     // Use ServiceProvider to allow Seeder to create background scopes

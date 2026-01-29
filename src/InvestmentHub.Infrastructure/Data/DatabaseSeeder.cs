@@ -21,9 +21,9 @@ public static class DatabaseSeeder
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        // 1. Apply Migrations (Synchronous - Required)
-        // NOTE: If this fails with "relation already exists", it means the database was created with EnsureCreatedAsync previously.
-        await context.Database.MigrateAsync();
+        // 1. Apply Migrations - REMOVED
+        // Migrations are now handled and protected in Program.cs. 
+        // We do strictly seeding here.
 
         // 2. Seed Core Data (Users/Portfolios) (Synchronous - Fast & Required)
         // Seed Demo User and Data

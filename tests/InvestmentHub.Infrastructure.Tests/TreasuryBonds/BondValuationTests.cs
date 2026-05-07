@@ -104,7 +104,7 @@ public class BondValuationTests
         if (symbol.AssetType != AssetType.Bond)
             return false;
 
-        return symbol.Exchange == "Catalyst" ||
+        return symbol.Exchange.Equals("Catalyst", StringComparison.OrdinalIgnoreCase) ||
                symbol.Ticker.StartsWith("FPC", StringComparison.OrdinalIgnoreCase) ||
                symbol.Ticker.StartsWith("BGK", StringComparison.OrdinalIgnoreCase);
     }

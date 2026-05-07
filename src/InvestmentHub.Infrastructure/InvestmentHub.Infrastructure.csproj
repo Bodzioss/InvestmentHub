@@ -37,6 +37,15 @@
     <PackageReference Include="YahooQuotesApi" Version="7.0.5" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\all_instruments_list.json" Link="all_instruments_list.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\ETFsList.csv" Link="ETFsList.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

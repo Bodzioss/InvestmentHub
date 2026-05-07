@@ -12,7 +12,7 @@ namespace InvestmentHub.E2E.Tests;
 public class InstrumentImportTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:15-alpine")
+        .WithImage("pgvector/pgvector:pg16")
         .Build();
 
     private readonly RabbitMqContainer _rabbitmq = new RabbitMqBuilder()
@@ -53,6 +53,23 @@ public class InstrumentImportTests : IAsyncLifetime
     {
         // Act
         // Create client to trigger application startup and seeding
+        // Act
+        // Create client to trigger application startup and seeding
+        var baseDir = AppContext.BaseDirectory;
+        Console.WriteLine($"[Test Debug] BaseDirectory: {baseDir}");
+        var filePath = Path.Combine(baseDir, "all_instruments_list.json");
+        Console.WriteLine($"[Test Debug] Checking file: {filePath} -> Exists: {File.Exists(filePath)}");
+
+        if (!File.Exists(filePath))
+        {
+             // List files in directory to see what's there
+             Console.WriteLine("[Test Debug] Files in BaseDirectory:");
+             foreach (var f in Directory.GetFiles(baseDir))
+             {
+                 Console.WriteLine($" - {Path.GetFileName(f)}");
+             }
+        }
+
         _apiFactory.CreateClient();
         
         // Wait for seeding to complete (it happens synchronously in Program.cs before Run)
@@ -62,7 +79,15 @@ public class InstrumentImportTests : IAsyncLifetime
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         // Assert
-        var count = await context.Instruments.CountAsync();
+        // Poll for data availability (Background seeding race condition)
+        int count = 0;
+        for (int i = 0; i < 60; i++)
+        {
+            count = await context.Instruments.CountAsync();
+            if (count > 0) break;
+            await Task.Delay(500);
+        }
+
         count.Should().BeGreaterThan(0, "Instruments should be imported from the JSON file");
         
         // Verify specific instruments

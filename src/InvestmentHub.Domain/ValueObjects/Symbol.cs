@@ -35,8 +35,8 @@ public sealed class Symbol : IEquatable<Symbol>
         if (string.IsNullOrWhiteSpace(ticker))
             throw new ArgumentException("Ticker cannot be null or empty", nameof(ticker));
 
-        if (ticker.Length > 50)
-            throw new ArgumentException("Ticker cannot exceed 50 characters", nameof(ticker));
+        if (ticker.Length > 10)
+            throw new ArgumentException("Ticker cannot exceed 10 characters", nameof(ticker));
 
         if (string.IsNullOrWhiteSpace(exchange))
             throw new ArgumentException("Exchange cannot be null or empty", nameof(exchange));

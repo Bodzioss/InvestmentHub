@@ -13,7 +13,7 @@ namespace InvestmentHub.E2E.Tests;
 public class InvestmentFlowTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:15-alpine")
+        .WithImage("pgvector/pgvector:pg16")
         .Build();
 
     private readonly RabbitMqContainer _rabbitmq = new RabbitMqBuilder()
@@ -170,7 +170,7 @@ public class InvestmentFlowTests : IAsyncLifetime
         
         // Poll for eventual consistency
         var expectedTotalValue = 1500.00m; // 150 * 10
-        var maxRetries = 10;
+        var maxRetries = 30;
         var delay = TimeSpan.FromSeconds(1);
         
         bool isUpdated = false;

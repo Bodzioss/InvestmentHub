@@ -26,6 +26,9 @@ public sealed class Money : IEquatable<Money>
     /// <exception cref="ArgumentException">Thrown when amount is negative</exception>
     public Money(decimal amount, Currency currency)
     {
+        if (amount < 0)
+            throw new ArgumentException("Money amount cannot be negative", nameof(amount));
+
         Amount = amount;
         Currency = currency;
     }

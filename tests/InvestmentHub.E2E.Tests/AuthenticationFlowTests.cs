@@ -14,7 +14,7 @@ namespace InvestmentHub.E2E.Tests;
 public class AuthenticationFlowTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:15-alpine")
+        .WithImage("pgvector/pgvector:pg16")
         .Build();
 
     private readonly RabbitMqContainer _rabbitmq = new RabbitMqBuilder()

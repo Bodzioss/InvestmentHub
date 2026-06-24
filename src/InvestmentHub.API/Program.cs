@@ -56,6 +56,8 @@ builder.AddNpgsqlDbContext<ApplicationDbContext>("postgres", configureDbContextO
 
 // Configure Marten for Event Sourcing
 var connectionString = builder.Configuration.GetConnectionString("postgres");
+var hasRabbitMq = !string.IsNullOrEmpty(builder.Configuration["RabbitMQ:ConnectionString"]);
+
 builder.Services.AddMarten(sp =>
 {
     var options = new StoreOptions();
@@ -90,9 +92,13 @@ builder.Services.AddMarten(sp =>
         .DocumentAlias("investment_read_model_v3")
         .UseNumericRevisions(true);
 
-    // Register MassTransitOutboxProjection as ASYNC projection
-    var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
-    options.Projections.Add(new MassTransitOutboxProjection(scopeFactory), ProjectionLifecycle.Async);
+    // Register MassTransitOutboxProjection as ASYNC projection ONLY if RabbitMQ is configured
+    if (hasRabbitMq)
+    {
+        var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+        options.Projections.Add(new MassTransitOutboxProjection(scopeFactory), ProjectionLifecycle.Async);
+    }
+    
     options.Projections.Add<InvestmentProjection>(ProjectionLifecycle.Inline);
     options.Projections.Add<PortfolioProjection>(ProjectionLifecycle.Inline);
     return options;
@@ -184,32 +190,36 @@ builder.Services.AddMediatR(cfg =>
     cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 });
 
-// Add MassTransit for messaging
-var rabbitMqConnectionString = builder.Configuration["RabbitMQ:ConnectionString"]
-    ?? "amqp://guest:guest@localhost:5672/";
+// Add MassTransit for messaging (OPTIONAL - only if RabbitMQ is configured)
+var rabbitMqConnectionString = builder.Configuration["RabbitMQ:ConnectionString"];
 
-// If Aspire endpoint doesn't include credentials, add them
-if (!rabbitMqConnectionString.Contains("@") && rabbitMqConnectionString.StartsWith("amqp://"))
+// Only add MassTransit if RabbitMQ connection string is provided
+if (!string.IsNullOrEmpty(rabbitMqConnectionString))
 {
-    rabbitMqConnectionString = rabbitMqConnectionString.Replace("amqp://", "amqp://guest:guest@");
-}
-
-builder.Services.AddMassTransit(x =>
-{
-    x.AddConsumer<NotificationConsumer>();
-
-    x.UsingRabbitMq((context, cfg) =>
+    // If Aspire endpoint doesn't include credentials, add them
+    if (!rabbitMqConnectionString.Contains("@") && rabbitMqConnectionString.StartsWith("amqp://"))
     {
-        // Simple configuration - MassTransit will parse the connection string
-        cfg.Host(rabbitMqConnectionString);
+        rabbitMqConnectionString = rabbitMqConnectionString.Replace("amqp://", "amqp://guest:guest@");
+    }
 
-        // Configure global retry policy with Exponential Backoff
-        cfg.UseMessageRetry(r => r.Exponential(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(2)));
+    builder.Services.AddMassTransit(x =>
+    {
+        x.AddConsumer<NotificationConsumer>();
 
-        // Configure endpoints (consumers will be added in later steps)
-        cfg.ConfigureEndpoints(context);
+        x.UsingRabbitMq((context, cfg) =>
+        {
+            // Simple configuration - MassTransit will parse the connection string
+            cfg.Host(rabbitMqConnectionString);
+
+            // Configure global retry policy with Exponential Backoff
+            cfg.UseMessageRetry(r => r.Exponential(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(2)));
+
+            // Configure endpoints (consumers will be added in later steps)
+            cfg.ConfigureEndpoints(context);
+        });
     });
-});
+}
+// Note: RabbitMQ will be configured only if connection string is provided in environment variables
 
 // Add health checks for infrastructure dependencies
 builder.Services.AddInfrastructureHealthChecks(builder.Configuration, builder.Environment);

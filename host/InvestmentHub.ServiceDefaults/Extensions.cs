@@ -261,6 +261,11 @@ public static class Extensions
                 options.Configuration = redisConnectionString;
             });
         }
+        else
+        {
+            // Fallback to in-memory distributed cache when Redis is not available
+            builder.Services.AddDistributedMemoryCache();
+        }
 
 
 

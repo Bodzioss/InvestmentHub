@@ -1,0 +1,27 @@
+name: Keep API Warm (Prevent Cold Start)
+
+on:
+  schedule:
+    # Uruchamia się co 10 minut
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Umożliwia ręczne uruchomienie do testów
+
+jobs:
+  ping-api:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping API endpoint
+        run: |
+          echo "Pinging API to prevent cold start at $(date)..."
+          
+          # Jeden prosty ping - API samo się obudzi
+          curl -X GET "https://investmenthub-api.lemonisland-783b8388.northeurope.azurecontainerapps.io/health" \
+            -H "Accept: application/json" \
+            -w "\nHTTP Status: %{http_code} | Response Time: %{time_total}s\n" \
+            --max-time 60 \
+            --connect-timeout 10 \
+            -s -S \
+            || echo "Ping completed (API may still be waking up)"
+          
+          echo "Done. Next ping in 10 minutes."
